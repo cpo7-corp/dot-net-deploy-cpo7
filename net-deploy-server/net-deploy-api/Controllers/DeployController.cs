@@ -31,6 +31,8 @@ public class DeployController(
         var settings = await settingsLogic.GetAsync();
         var logEntries = new List<DeployLogEntry>();
 
+        var responseLock = new SemaphoreSlim(1, 1);
+
         async Task Log(string level, string message, string? serviceId = null)
         {
             var entry = new DeployLogEntry
@@ -41,19 +43,30 @@ public class DeployController(
                 ServiceId = serviceId,
                 Timestamp = DateTime.UtcNow
             };
-            logEntries.Add(entry);
 
-            // SSE format: data: <json>\n\n
+            lock (logEntries)
+            {
+                logEntries.Add(entry);
+            }
+
             var line = $"data: {{\"level\":\"{level}\",\"message\":{System.Text.Json.JsonSerializer.Serialize(message)},\"serviceId\":\"{serviceId}\"}}\n\n";
-            await Response.WriteAsync(line);
-            await Response.Body.FlushAsync();
-        }
 
-        var results = new List<(string Name, bool Success)>();
+            await responseLock.WaitAsync();
+            try
+            {
+                await Response.WriteAsync(line);
+                await Response.Body.FlushAsync();
+            }
+            finally
+            {
+                responseLock.Release();
+            }
+        }
 
         var vpsSettings = settings.VpsEnvironments.FirstOrDefault(e => e.Id == request.EnvironmentId)
                           ?? settings.VpsEnvironments.FirstOrDefault()
                           ?? new VpsSettings();
+
         // PHASE 1: Optional Prep (Clone all first)
         if (request.CloneAllFirst)
         {
@@ -69,23 +82,26 @@ public class DeployController(
             await Log("INFO", "✅ [PHASE 1] Pre-clone complete. Starting builds/deploys...");
         }
 
-        foreach (var config in request.Services)
+        var deployTasks = request.Services.Select(async config =>
         {
             var serviceId = config.ServiceId;
             var service = await servicesLogic.GetByIdAsync(serviceId);
             if (service is null)
             {
                 await Log("WARNING", $"⚠️ Service {serviceId} not found – skipping.");
-                results.Add(($"Unknown ({serviceId})", false));
-                continue;
+                return (Name: $"Unknown ({serviceId})", Success: false);
             }
 
             var success = await deployLogic.DeployServiceAsync(service, settings, Log, config.Branch, vpsSettings, request.ForceClean, request.CloneAllFirst, request.SkipBuildIfOutputExists);
-            results.Add((service.Name, success));
 
             if (success)
                 await servicesLogic.MarkDeployedAsync(serviceId);
-        }
+
+            return (Name: service.Name, Success: success);
+        });
+
+        var resultsArray = await Task.WhenAll(deployTasks);
+        var results = resultsArray.ToList();
 
         await Log("INFO", "──────────────────────────────────────────────────");
         await Log("INFO", "📊 DEPLOYMENT SUMMARY:");

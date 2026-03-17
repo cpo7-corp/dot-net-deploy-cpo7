@@ -41,7 +41,13 @@ builder.Services.AddSingleton<SettingsLogic>();
 builder.Services.AddSingleton<ServicesLogic>();
 builder.Services.AddSingleton<DeployLogsLogic>();
 builder.Services.AddSingleton<GitLogic>();
+
+// Deploy dependencies
+builder.Services.AddSingleton<ProcessRunner>();
+builder.Services.AddSingleton<BuildManager>();
+builder.Services.AddSingleton<TransferManager>();
 builder.Services.AddSingleton<DeployLogic>();
+
 builder.Services.AddSingleton<IISLogic>();
 
 var app = builder.Build();
