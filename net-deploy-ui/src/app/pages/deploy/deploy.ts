@@ -30,6 +30,7 @@ export class DeployComponent implements OnInit {
   logs = signal<DeployLogEntry[]>([]);
   elapsedTime = signal<string>('00:00');
   failedServiceIds = signal<string[]>([]);
+  cloneMultiple = signal<boolean>(false);
   private timerInterval: any;
   private startTime: number = 0;
 
@@ -75,7 +76,7 @@ export class DeployComponent implements OnInit {
     this.selectedServiceIds.clear();
   }
 
-  startDeploy(configs?: { serviceId: string, branch: string }[], forceClean: boolean = true) {
+  startDeploy(configs?: { serviceId: string, branch: string }[], forceClean: boolean = true, cloneAllFirst: boolean | null = null) {
     if (!configs && this.selectedServiceIds.size === 0) return;
 
     this.deploying.set(true);
@@ -88,7 +89,9 @@ export class DeployComponent implements OnInit {
       branch: this.serviceBranches[id] || 'main'
     }));
 
-    this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId(), forceClean).subscribe({
+    const shouldCloneAll = cloneAllFirst !== null ? cloneAllFirst : this.cloneMultiple();
+
+    this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId(), forceClean, shouldCloneAll).subscribe({
       next: (entry) => {
         this.logs.update(prev => [...prev, entry]);
         
@@ -132,7 +135,7 @@ export class DeployComponent implements OnInit {
       branch: this.serviceBranches[id] || 'main'
     }));
 
-    this.startDeploy(configs, false);
+    this.startDeploy(configs, false, false);
   }
 
   getLogClass(level: string): string {

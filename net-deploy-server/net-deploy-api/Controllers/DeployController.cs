@@ -54,6 +54,20 @@ public class DeployController(
         var vpsSettings = settings.VpsEnvironments.FirstOrDefault(e => e.Id == request.EnvironmentId)
                           ?? settings.VpsEnvironments.FirstOrDefault()
                           ?? new VpsSettings();
+        // PHASE 1: Optional Prep (Clone all first)
+        if (request.CloneAllFirst)
+        {
+            await Log("INFO", "🔍 [PHASE 1] Preparing all repositories first (Clone/Pull)...");
+            foreach (var config in request.Services)
+            {
+                var srv = await servicesLogic.GetByIdAsync(config.ServiceId);
+                if (srv != null)
+                {
+                    await deployLogic.PrepGitOnlyAsync(srv, settings, Log, config.Branch, request.ForceClean);
+                }
+            }
+            await Log("INFO", "✅ [PHASE 1] Pre-clone complete. Starting builds/deploys...");
+        }
 
         foreach (var config in request.Services)
         {
@@ -66,7 +80,7 @@ public class DeployController(
                 continue;
             }
 
-            var success = await deployLogic.DeployServiceAsync(service, settings, Log, config.Branch, vpsSettings, request.ForceClean);
+            var success = await deployLogic.DeployServiceAsync(service, settings, Log, config.Branch, vpsSettings, request.ForceClean, request.CloneAllFirst);
             results.Add((service.Name, success));
 
             if (success)
@@ -106,5 +120,5 @@ public class DeployController(
         Ok(await deployLogsLogic.GetRecentSessionsAsync(count));
 
     public record ServiceDeploymentConfig(string ServiceId, string? Branch);
-    public record DeployRequest(List<ServiceDeploymentConfig> Services, string? EnvironmentId, bool ForceClean = false);
+    public record DeployRequest(List<ServiceDeploymentConfig> Services, string? EnvironmentId, bool ForceClean = false, bool CloneAllFirst = false);
 }

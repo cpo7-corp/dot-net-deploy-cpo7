@@ -24,7 +24,8 @@ public class DeployLogic(
         LogCallback log,
         string? branchOverride = null,
         VpsSettings? vpsOverride = null,
-        bool forceClean = false)
+        bool forceClean = false,
+        bool skipPull = false)
     {
         var serviceId = service.Id;
         const int maxRetries = 3;
@@ -39,7 +40,10 @@ public class DeployLogic(
 
             try
             {
-                var success = await DeployServiceInternalAsync(service, settings, log, branchOverride, vpsOverride, forceClean);
+                // Only use forceClean on the very first attempt of the batch.
+                // Subsequent retries should be incremental to save time.
+                var effectiveClean = attempt == 1 && forceClean;
+                var success = await DeployServiceInternalAsync(service, settings, log, branchOverride, vpsOverride, effectiveClean, skipPull);
                 if (success) return true;
             }
             catch (Exception ex)
@@ -56,13 +60,30 @@ public class DeployLogic(
         return false;
     }
 
+    public async Task<bool> PrepGitOnlyAsync(
+        ServiceDefinition service,
+        AppSettings settings,
+        LogCallback log,
+        string? branchOverride = null,
+        bool forceClean = false)
+    {
+        var (repoUrl, branch, projectPath) = gitLogic.ParseGitUrl(service.RepoUrl);
+        var effectiveBranch = !string.IsNullOrWhiteSpace(branchOverride) ? branchOverride 
+                           : (!string.IsNullOrWhiteSpace(service.Branch) && service.Branch != "main" ? service.Branch : branch);
+        var effectiveProjectPath = string.IsNullOrWhiteSpace(service.ProjectPath) ? projectPath : service.ProjectPath;
+
+        await log("INFO", $"📥 [Prep] Pulling Git for {service.Name} ({effectiveBranch})...", service.Id);
+        return await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean);
+    }
+
     private async Task<bool> DeployServiceInternalAsync(
         ServiceDefinition service,
         AppSettings settings,
         LogCallback log,
         string? branchOverride = null,
         VpsSettings? vpsOverride = null,
-        bool forceClean = false)
+        bool forceClean = false,
+        bool skipPull = false)
     {
         var serviceId = service.Id;
 
@@ -77,14 +98,21 @@ public class DeployLogic(
         await log("INFO", $"▶ Starting deploy for: {service.Name}", serviceId);
 
         // Step 1 – git pull
-        await log("INFO", $"📥 Pulling latest from Git ({repoUrl}, branch: {effectiveBranch})...", serviceId);
-        var pulled = await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean);
-        if (!pulled)
+        if (!skipPull)
         {
-            await log("ERROR", "❌ Git pull failed.", serviceId);
-            return false;
+            await log("INFO", $"📥 Pulling latest from Git ({repoUrl}, branch: {effectiveBranch})...", serviceId);
+            var pulled = await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean);
+            if (!pulled)
+            {
+                await log("ERROR", "❌ Git pull failed.", serviceId);
+                return false;
+            }
+            await log("SUCCESS", "✅ Git pull successful.", serviceId);
         }
-        await log("SUCCESS", "✅ Git pull successful.", serviceId);
+        else
+        {
+            await log("INFO", "⏭️ Skipping Git pull (already prepared).", serviceId);
+        }
 
         // Step 2 – Build & Publish
         var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl, effectiveProjectPath);
