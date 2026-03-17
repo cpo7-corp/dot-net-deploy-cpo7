@@ -28,6 +28,10 @@ export class DeployComponent implements OnInit {
   loading = signal<boolean>(true);
   deploying = signal<boolean>(false);
   logs = signal<DeployLogEntry[]>([]);
+  elapsedTime = signal<string>('00:00');
+  failedServiceIds = signal<string[]>([]);
+  private timerInterval: any;
+  private startTime: number = 0;
 
   ngOnInit() {
     this.servicesSvc.getAll().subscribe({
@@ -71,13 +75,15 @@ export class DeployComponent implements OnInit {
     this.selectedServiceIds.clear();
   }
 
-  startDeploy() {
-    if (this.selectedServiceIds.size === 0) return;
+  startDeploy(configs?: { serviceId: string, branch: string }[]) {
+    if (!configs && this.selectedServiceIds.size === 0) return;
 
     this.deploying.set(true);
     this.logs.set([]);
+    this.failedServiceIds.set([]);
+    this.startTimer();
 
-    const deploymentConfigs = Array.from(this.selectedServiceIds).map(id => ({
+    const deploymentConfigs = configs || Array.from(this.selectedServiceIds).map(id => ({
       serviceId: id,
       branch: this.serviceBranches[id] || 'main'
     }));
@@ -85,10 +91,17 @@ export class DeployComponent implements OnInit {
     this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId()).subscribe({
       next: (entry) => {
         this.logs.update(prev => [...prev, entry]);
+        
+        // Track failed services
+        if (entry.level === 'ERROR' && entry.serviceId) {
+          this.failedServiceIds.update(fails => [...new Set([...fails, entry.serviceId!])]);
+        }
+        
         this.scrollToBottom();
       },
       complete: () => {
         this.deploying.set(false);
+        this.stopTimer();
         // Reload services to update status/last deployed date
         this.loading.set(true);
         this.servicesSvc.getAll().subscribe(data => {
@@ -98,6 +111,7 @@ export class DeployComponent implements OnInit {
       },
       error: (err) => {
         this.deploying.set(false);
+        this.stopTimer();
         console.error('Deploy error', err);
         this.logs.update(prev => [...prev, {
           sessionId: 'client',
@@ -109,8 +123,42 @@ export class DeployComponent implements OnInit {
     });
   }
 
+  retryFailed() {
+    const failedIds = this.failedServiceIds();
+    if (failedIds.length === 0) return;
+
+    const configs = failedIds.map(id => ({
+      serviceId: id,
+      branch: this.serviceBranches[id] || 'main'
+    }));
+
+    this.startDeploy(configs);
+  }
+
   getLogClass(level: string): string {
     return `log-${level.toLowerCase()}`;
+  }
+
+  private startTimer() {
+    this.startTime = Date.now();
+    this.elapsedTime.set('00:00');
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    
+    this.timerInterval = setInterval(() => {
+      const seconds = Math.floor((Date.now() - this.startTime) / 1000);
+      const mins = Math.floor(seconds / 60);
+      const secs = seconds % 60;
+      this.elapsedTime.set(
+        `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+      );
+    }, 1000);
+  }
+
+  private stopTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+      this.timerInterval = null;
+    }
   }
 
   private scrollToBottom() {

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.Services.Entities;
 using NET.Deploy.Api.Logic.Settings.Entities;
+using Renci.SshNet;
 
 namespace NET.Deploy.Api.Logic.Deploy;
 
@@ -75,7 +76,7 @@ public class DeployLogic(
 
         // Step 1 – git pull
         await log("INFO", $"📥 Pulling latest from Git ({repoUrl}, branch: {effectiveBranch})...", serviceId);
-        var pulled = await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log);
+        var pulled = await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath);
         if (!pulled)
         {
             await log("ERROR", "❌ Git pull failed.", serviceId);
@@ -91,6 +92,16 @@ public class DeployLogic(
             Path.GetTempPath(),
             "net-deploy",
             service.Id ?? service.Name);
+
+        if (Directory.Exists(publishOutput))
+        {
+            try {
+                Directory.Delete(publishOutput, true);
+                await log("INFO", "🧹 Cleared old publish output folder.", serviceId);
+            } catch (Exception ex) {
+                await log("WARNING", $"Could not clear old publish folder: {ex.Message}");
+            }
+        }
 
         var isNode = service.ServiceType is "Angular" or "React" || effectiveProjectPath.EndsWith("package.json", StringComparison.OrdinalIgnoreCase);
         var isWindowsService = service.ServiceType == "WindowsService";
@@ -108,7 +119,7 @@ public class DeployLogic(
         bool buildSuccess = false;
         if (isNode)
         {
-            buildSuccess = await RunNpmBuildAsync(projectFullPath, publishOutput, log, serviceId);
+            buildSuccess = await RunNpmBuildAsync(projectFullPath, publishOutput, log, serviceId, service.ServiceType);
         }
         else
         {
@@ -123,19 +134,34 @@ public class DeployLogic(
         }
         await log("SUCCESS", "✅ Build successful.", serviceId);
 
-        // Step 3 – Copy to deploy target
+        // Step 3 – Copy/Upload files
         var targetPath = service.DeployTargetPath;
+        if (string.IsNullOrWhiteSpace(targetPath))
+        {
+            await log("ERROR", "❌ Missing DeployTargetPath for service.", serviceId);
+            return false;
+        }
 
-        await log("INFO", $"📂 Copying to: {targetPath}", serviceId);
         try
         {
-            CopyDirectory(publishOutput, targetPath);
-            await log("SUCCESS", $"✅ Files copied to {targetPath}", serviceId);
+            if (vpsOverride != null && !string.IsNullOrWhiteSpace(vpsOverride.Host) && vpsOverride.Host != "localhost" && vpsOverride.Host != "127.0.0.1")
+            {
+                await log("INFO", $"🚀 Uploading files to remote VPS: {vpsOverride.Host} at {targetPath}...", serviceId);
+                await UploadDirectoryToRemoteAsync(publishOutput, targetPath, vpsOverride, log, serviceId);
+                await log("SUCCESS", $"✅ Files uploaded to remote: {vpsOverride.Host}", serviceId);
+            }
+            else
+            {
+                await log("INFO", $"📂 Copying to: {targetPath} (local)", serviceId);
+                CopyDirectory(publishOutput, targetPath);
+                await log("SUCCESS", $"✅ Files copied locally to {targetPath}", serviceId);
+            }
         }
         catch (Exception ex)
         {
             if (isWindowsService) await RunProcessAsync("sc.exe", $"start {service.IisSiteName}", ".", log, serviceId);
-            await log("ERROR", $"❌ Copy failed: {ex.Message}", serviceId);
+            await log("ERROR", $"❌ Transfer failed: {ex.Message}", serviceId);
+            logger.LogError(ex, "Failed to copy/upload files to {Target}", targetPath);
             return false;
         }
 
@@ -186,18 +212,31 @@ public class DeployLogic(
         return true;
     }
 
-    private async Task<bool> RunNpmBuildAsync(string projectPath, string outputPath, LogCallback log, string? serviceId)
+    private async Task<bool> RunNpmBuildAsync(string projectPath, string outputPath, LogCallback log, string? serviceId, string serviceType)
     {
-        var projectDir = Path.GetDirectoryName(projectPath)!;
-        var npmCmd = Environment.OSVersion.Platform == PlatformID.Win32NT ? "npm.cmd" : "npm";
+        var projectDir = Directory.Exists(projectPath) ? projectPath : Path.GetDirectoryName(projectPath)!;
+        var isWindows = Environment.OSVersion.Platform == PlatformID.Win32NT;
+        
+        // Use cmd /c on Windows to avoid issues with .cmd files and environment resolution
+        string Run(string verb, string args) => isWindows ? "cmd.exe" : verb;
+        string Args(string verb, string args) => isWindows ? $"/c \"{verb} {args}\"" : args;
 
-        await log("INFO", "📦 Running npm install...", serviceId);
-        if (!await RunProcessAsync(npmCmd, "install", projectDir, log, serviceId))
+        await log("INFO", $"📦 Running npm install in: {projectDir}", serviceId);
+        if (!await RunProcessAsync(Run("npm", "install"), Args("npm", "install"), projectDir, log, serviceId))
             return false;
 
-        await log("INFO", "🏗️ Running npm run build...", serviceId);
-        if (!await RunProcessAsync(npmCmd, "run build", projectDir, log, serviceId))
-            return false;
+        if (serviceType == "Angular")
+        {
+            await log("INFO", "🏗️ Running ng build --configuration production...", serviceId);
+            if (!await RunProcessAsync(Run("npx", "ng build --configuration production"), Args("npx", "ng build --configuration production"), projectDir, log, serviceId))
+                return false;
+        }
+        else
+        {
+            await log("INFO", "🏗️ Running npm run build...", serviceId);
+            if (!await RunProcessAsync(Run("npm", "run build"), Args("npm", "run build"), projectDir, log, serviceId))
+                return false;
+        }
 
         string? builtFolder = null;
         var distPath = Path.Combine(projectDir, "dist");
@@ -231,9 +270,74 @@ public class DeployLogic(
         LogCallback log,
         string? serviceId)
     {
-        var projectDir = Path.GetDirectoryName(projectPath)!;
+        var projectDir = Directory.Exists(projectPath) ? projectPath : Path.GetDirectoryName(projectPath)!;
         var args = $"publish \"{projectPath}\" -c Release -o \"{outputPath}\" --nologo";
+        await log("INFO", $"🏗️ Running dotnet publish in: {projectDir}", serviceId);
         return await RunProcessAsync("dotnet", args, projectDir, log, serviceId);
+    }
+
+    private async Task UploadDirectoryToRemoteAsync(string localPath, string remotePath, VpsSettings vps, LogCallback log, string? serviceId)
+    {
+        using var client = new SftpClient(vps.Host, vps.Port > 0 ? vps.Port : 22, vps.Username, vps.Password);
+        client.Connect();
+
+        // Standardize remote path (Windows-style or Unix-style based on what the SFTP server expects)
+        var root = remotePath.Replace("\\", "/");
+
+        async Task Upload(string localDir, string remoteDir)
+        {
+            // Create remote dir if not exists
+            if (!client.Exists(remoteDir))
+            {
+                EnsureRemoteDirectory(client, remoteDir);
+            }
+
+            foreach (var file in Directory.GetFiles(localDir))
+            {
+                using var fs = File.OpenRead(file);
+                var dest = remoteDir + "/" + Path.GetFileName(file);
+                client.UploadFile(fs, dest);
+                // Optional: await log("INFO", $"  Uploaded {Path.GetFileName(file)}", serviceId);
+            }
+
+            foreach (var subDir in Directory.GetDirectories(localDir))
+            {
+                var dirName = Path.GetFileName(subDir);
+                await Upload(subDir, remoteDir + "/" + dirName);
+            }
+        }
+
+        await Upload(localPath, root);
+        client.Disconnect();
+    }
+
+    private void EnsureRemoteDirectory(SftpClient client, string path)
+    {
+        if (client.Exists(path)) return;
+
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var current = "";
+        
+        int startIndex = 0;
+        // Handle absolute Windows paths like C:/ or /C:/ via SFTP
+        if (path.Contains(":/"))
+        {
+            current = parts[0] + "/";
+            startIndex = 1;
+        }
+        else if (path.StartsWith("/"))
+        {
+            current = "/";
+        }
+
+        for (int i = startIndex; i < parts.Length; i++)
+        {
+            current += (current.EndsWith("/") ? "" : "/") + parts[i];
+            if (!client.Exists(current))
+            {
+                client.CreateDirectory(current);
+            }
+        }
     }
 
     private static void CopyDirectory(string source, string destination)

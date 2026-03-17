@@ -8,34 +8,42 @@ public class GitLogic(ILogger<GitLogic> logger)
     /// <summary>
     /// Clones the repo if it does not exist locally, otherwise pulls latest changes.
     /// </summary>
-    public async Task<bool> PullAsync(GitSettings git, string repoUrl, string branch, Deploy.LogCallback? log = null)
+    public async Task<bool> PullAsync(GitSettings git, string repoUrl, string branch, Deploy.LogCallback? log = null, string? sparsePath = null)
     {
         var repoDirName = GetSafeRepoName(repoUrl);
         var repoPath = Path.Combine(git.LocalBaseDir, repoDirName);
         var authUrl = BuildAuthUrl(git, repoUrl);
 
-        if (!Directory.Exists(Path.Combine(repoPath, ".git")))
+        // Always delete and start fresh as requested
+        if (Directory.Exists(repoPath))
         {
-            if (Directory.Exists(repoPath))
-            {
-                try {
-                    logger.LogInformation("Directory {Path} exists but is not a git repo. Deleting to start fresh.", repoPath);
-                    Directory.Delete(repoPath, true);
-                } catch (Exception ex) {
-                    if (log != null) await log("WARNING", $"Could not fully clear folder (files might be in use): {ex.Message}");
-                }
+            try {
+                logger.LogInformation("Deleting existing directory to start fresh: {Path}", repoPath);
+                if (log != null) await log("INFO", $"🧹 Deleting existing directory to ensure fresh clone...");
+                Directory.Delete(repoPath, true);
+            } catch (Exception ex) {
+                if (log != null) await log("WARNING", $"Could not fully clear folder: {ex.Message}");
             }
-
-            logger.LogInformation("Cloning repo {Url} into {Path}", repoUrl, repoPath);
-            if (log != null) await log("INFO", $"Starting clone...");
-            Directory.CreateDirectory(repoPath);
-            return await RunGitAsync(repoPath, $"clone {authUrl} .", "Cloning", log);
         }
 
-        logger.LogInformation("Pulling latest from branch {Branch} in {Repo}", branch, repoUrl);
-        if (log != null) await log("INFO", $"Updating existing repo...");
-        await RunGitAsync(repoPath, "fetch --all", "Fetch", log);
-        return await RunGitAsync(repoPath, $"reset --hard origin/{branch}", "Reset", log);
+        logger.LogInformation("Cloning repo {Url} into {Path}", repoUrl, repoPath);
+        if (log != null) await log("INFO", $"📥 Starting fresh clone (branch: {branch})...");
+        Directory.CreateDirectory(repoPath);
+        
+        var cloneArgs = !string.IsNullOrWhiteSpace(sparsePath) 
+            ? $"clone -b {branch} --filter=blob:none --sparse {authUrl} ." 
+            : $"clone -b {branch} {authUrl} .";
+
+        if (!await RunGitAsync(repoPath, cloneArgs, "Cloning", log))
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(sparsePath))
+        {
+            if (log != null) await log("INFO", $"🎯 Setting sparse-checkout for: {sparsePath}");
+            await RunGitAsync(repoPath, $"sparse-checkout set {sparsePath}", "Sparse-Checkout", log);
+        }
+        
+        return true;
     }
 
     public string GetRepoLocalPath(GitSettings git, string repoUrl)
