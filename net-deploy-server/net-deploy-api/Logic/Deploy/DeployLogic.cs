@@ -25,7 +25,8 @@ public class DeployLogic(
         string? branchOverride = null,
         VpsSettings? vpsOverride = null,
         bool forceClean = false,
-        bool skipPull = false)
+        bool skipPull = false,
+        bool skipBuildIfOutputExists = false)
     {
         var serviceId = service.Id;
         const int maxRetries = 3;
@@ -43,7 +44,7 @@ public class DeployLogic(
                 // Only use forceClean on the very first attempt of the batch.
                 // Subsequent retries should be incremental to save time.
                 var effectiveClean = attempt == 1 && forceClean;
-                var success = await DeployServiceInternalAsync(service, settings, log, branchOverride, vpsOverride, effectiveClean, skipPull);
+                var success = await DeployServiceInternalAsync(service, settings, log, branchOverride, vpsOverride, effectiveClean, skipPull, skipBuildIfOutputExists);
                 if (success) return true;
             }
             catch (Exception ex)
@@ -83,9 +84,23 @@ public class DeployLogic(
         string? branchOverride = null,
         VpsSettings? vpsOverride = null,
         bool forceClean = false,
-        bool skipPull = false)
+        bool skipPull = false,
+        bool skipBuildIfOutputExists = false)
     {
         var serviceId = service.Id;
+        var publishOutput = Path.Combine(
+            Path.GetTempPath(),
+            "net-deploy",
+            service.Id ?? service.Name);
+
+        var isNode = service.ServiceType is "Angular" or "React" || (service.RepoUrl.Contains("package.json") || (service.ProjectPath?.EndsWith("package.json") ?? false));
+        var isWindowsService = service.ServiceType == "WindowsService";
+
+        if (skipBuildIfOutputExists && Directory.Exists(publishOutput) && Directory.GetFileSystemEntries(publishOutput).Any())
+        {
+            await log("INFO", "⏭️ [Skip] Build output already exists and skip requested. Proceeding directly to transfer...", serviceId);
+            goto TransferPhase;
+        }
 
         // Automatically parse repo/branch/path if a full GitHub URL is provided
         var (repoUrl, branch, projectPath) = gitLogic.ParseGitUrl(service.RepoUrl);
@@ -118,23 +133,15 @@ public class DeployLogic(
         var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl, effectiveProjectPath);
         var projectFullPath = Path.Combine(repoLocalPath, effectiveProjectPath);
 
-        var publishOutput = Path.Combine(
-            Path.GetTempPath(),
-            "net-deploy",
-            service.Id ?? service.Name);
-
         if (Directory.Exists(publishOutput))
         {
             try {
-                Directory.Delete(publishOutput, true);
+                DeleteDirectoryRecursively(publishOutput);
                 await log("INFO", "🧹 Cleared old publish output folder.", serviceId);
             } catch (Exception ex) {
                 await log("WARNING", $"Could not clear old publish folder: {ex.Message}");
             }
         }
-
-        var isNode = service.ServiceType is "Angular" or "React" || effectiveProjectPath.EndsWith("package.json", StringComparison.OrdinalIgnoreCase);
-        var isWindowsService = service.ServiceType == "WindowsService";
 
         // Step 2 – Stop service if it's a Windows Service
         if (isWindowsService)
@@ -164,6 +171,7 @@ public class DeployLogic(
         }
         await log("SUCCESS", "✅ Build successful.", serviceId);
 
+    TransferPhase:
         // Step 3 – Copy/Upload files
         var targetPath = service.DeployTargetPath;
         if (string.IsNullOrWhiteSpace(targetPath))
@@ -385,5 +393,17 @@ public class DeployLogic(
             var subDest = Path.Combine(destination, Path.GetFileName(dir));
             CopyDirectory(dir, subDest);
         }
+    }
+
+    private void DeleteDirectoryRecursively(string path)
+    {
+        if (!Directory.Exists(path)) return;
+
+        foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+
+        Directory.Delete(path, true);
     }
 }
