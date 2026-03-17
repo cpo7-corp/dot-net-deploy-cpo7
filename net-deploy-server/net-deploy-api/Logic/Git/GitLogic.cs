@@ -8,53 +8,107 @@ public class GitLogic(ILogger<GitLogic> logger)
     /// <summary>
     /// Clones the repo if it does not exist locally, otherwise pulls latest changes.
     /// </summary>
-    public async Task<bool> PullAsync(GitSettings git, string repoUrl, string branch, Deploy.LogCallback? log = null, string? sparsePath = null)
+    public async Task<bool> PullAsync(GitSettings git, string repoUrl, string branch, Deploy.LogCallback? log = null, string? sparsePath = null, bool forceClean = false)
     {
-        var repoDirName = GetSafeRepoName(repoUrl);
+        var repoDirName = GetSafeRepoName(repoUrl, sparsePath);
         var repoPath = Path.Combine(git.LocalBaseDir, repoDirName);
         var authUrl = BuildAuthUrl(git, repoUrl);
 
-        // Always delete and start fresh as requested
-        if (Directory.Exists(repoPath))
+        // 1. Force Clean Logic
+        if (Directory.Exists(repoPath) && forceClean)
         {
             try {
-                logger.LogInformation("Deleting existing directory to start fresh: {Path}", repoPath);
-                if (log != null) await log("INFO", $"🧹 Deleting existing directory to ensure fresh clone...");
-                Directory.Delete(repoPath, true);
+                if (log != null) await log("INFO", $"🧹 [Clean] Deleting existing directory to ensure fresh clone...");
+                DeleteDirectoryRecursively(repoPath);
             } catch (Exception ex) {
-                if (log != null) await log("WARNING", $"Could not fully clear folder: {ex.Message}");
+                if (log != null) await log("WARNING", $"Could not fully clear folder (files might be in use): {ex.Message}");
+                // If we can't clear it but want a fresh clone, we have a problem. 
+                // However, we'll try to let git handle it or fail later.
             }
         }
 
-        logger.LogInformation("Cloning repo {Url} into {Path}", repoUrl, repoPath);
-        if (log != null) await log("INFO", $"📥 Starting fresh clone (branch: {branch})...");
-        Directory.CreateDirectory(repoPath);
-        
-        var cloneArgs = !string.IsNullOrWhiteSpace(sparsePath) 
-            ? $"clone -b {branch} --filter=blob:none --sparse {authUrl} ." 
-            : $"clone -b {branch} {authUrl} .";
-
-        if (!await RunGitAsync(repoPath, cloneArgs, "Cloning", log))
-            return false;
-
-        if (!string.IsNullOrWhiteSpace(sparsePath))
+        // 2. Clone/Sparse-Checkout Logic (if .git is missing)
+        if (!Directory.Exists(Path.Combine(repoPath, ".git")))
         {
-            if (log != null) await log("INFO", $"🎯 Setting sparse-checkout for: {sparsePath}");
-            await RunGitAsync(repoPath, $"sparse-checkout set {sparsePath}", "Sparse-Checkout", log);
+            if (Directory.Exists(repoPath))
+            {
+                try { 
+                    DeleteDirectoryRecursively(repoPath); 
+                } catch (Exception ex) {
+                    if (log != null) await log("ERROR", "❌ Cannot clone: Target folder exists and is not a git repo, and cannot be deleted. Try manual cleanup.");
+                    return false;
+                }
+            }
+
+            logger.LogInformation("Cloning repo {Url} into {Path}", repoUrl, repoPath);
+            if (log != null) await log("INFO", $"📥 Starting fresh clone (branch: {branch})...");
+            Directory.CreateDirectory(repoPath);
+            
+            var cloneArgs = !string.IsNullOrWhiteSpace(sparsePath) 
+                ? $"clone -b {branch} --filter=blob:none --sparse {authUrl} ." 
+                : $"clone -b {branch} {authUrl} .";
+
+            if (!await RunGitAsync(repoPath, cloneArgs, "Cloning", log))
+                return false;
+
+            if (!string.IsNullOrWhiteSpace(sparsePath))
+            {
+                if (log != null) await log("INFO", $"🎯 Setting sparse-checkout for: {sparsePath}");
+                await RunGitAsync(repoPath, $"sparse-checkout set {sparsePath}", "Sparse-Checkout", log);
+            }
+            
+            return true;
         }
+
+        // 3. Incremental Update Logic
+        logger.LogInformation("Updating existing repo from branch {Branch} in {Repo}", branch, repoUrl);
+        if (log != null) await log("INFO", $"♻️ Updating existing repo (incremental pull)...");
         
-        return true;
+        // Clean any local locks/index issues if they exist
+        var lockFile = Path.Combine(repoPath, ".git", "index.lock");
+        if (File.Exists(lockFile)) File.Delete(lockFile);
+
+        if (!await RunGitAsync(repoPath, "fetch --all", "Fetch", log))
+            return false;
+            
+        return await RunGitAsync(repoPath, $"reset --hard origin/{branch}", "Reset", log);
     }
 
-    public string GetRepoLocalPath(GitSettings git, string repoUrl)
+    private void DeleteDirectoryRecursively(string path)
     {
-        return Path.Combine(git.LocalBaseDir, GetSafeRepoName(repoUrl));
+        if (!Directory.Exists(path)) return;
+
+        foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+        {
+            File.SetAttributes(file, FileAttributes.Normal);
+        }
+
+        Directory.Delete(path, true);
     }
 
-    private string GetSafeRepoName(string repoUrl)
+    public string GetRepoLocalPath(GitSettings git, string repoUrl, string? sparsePath = null)
+    {
+        return Path.Combine(git.LocalBaseDir, GetSafeRepoName(repoUrl, sparsePath));
+    }
+
+    private string GetSafeRepoName(string repoUrl, string? sparsePath = null)
     {
         var uri = new Uri(repoUrl);
         var name = uri.AbsolutePath.Trim('/').Replace("/", "_").Replace(".git", "");
+        
+        if (!string.IsNullOrWhiteSpace(sparsePath))
+        {
+            var cleanPath = sparsePath.Replace("/", "_").Replace("\\", "_");
+            // If it's a file path, try to get just the folder part for cleaner naming
+            if (cleanPath.Contains(".csproj") || cleanPath.Contains("package.json"))
+            {
+                var dir = Path.GetDirectoryName(sparsePath.Replace("/", "\\"));
+                if (!string.IsNullOrEmpty(dir)) 
+                    cleanPath = dir.Replace("/", "_").Replace("\\", "_");
+            }
+            name += "_" + cleanPath;
+        }
+
         return string.IsNullOrWhiteSpace(name) ? "unknown_repo" : name;
     }
 

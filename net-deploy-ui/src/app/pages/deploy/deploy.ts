@@ -75,7 +75,7 @@ export class DeployComponent implements OnInit {
     this.selectedServiceIds.clear();
   }
 
-  startDeploy(configs?: { serviceId: string, branch: string }[]) {
+  startDeploy(configs?: { serviceId: string, branch: string }[], forceClean: boolean = true) {
     if (!configs && this.selectedServiceIds.size === 0) return;
 
     this.deploying.set(true);
@@ -88,7 +88,7 @@ export class DeployComponent implements OnInit {
       branch: this.serviceBranches[id] || 'main'
     }));
 
-    this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId()).subscribe({
+    this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId(), forceClean).subscribe({
       next: (entry) => {
         this.logs.update(prev => [...prev, entry]);
         
@@ -132,7 +132,7 @@ export class DeployComponent implements OnInit {
       branch: this.serviceBranches[id] || 'main'
     }));
 
-    this.startDeploy(configs);
+    this.startDeploy(configs, false);
   }
 
   getLogClass(level: string): string {

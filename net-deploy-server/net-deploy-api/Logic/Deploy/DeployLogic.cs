@@ -23,7 +23,8 @@ public class DeployLogic(
         AppSettings settings,
         LogCallback log,
         string? branchOverride = null,
-        VpsSettings? vpsOverride = null)
+        VpsSettings? vpsOverride = null,
+        bool forceClean = false)
     {
         var serviceId = service.Id;
         const int maxRetries = 3;
@@ -38,7 +39,7 @@ public class DeployLogic(
 
             try
             {
-                var success = await DeployServiceInternalAsync(service, settings, log, branchOverride, vpsOverride);
+                var success = await DeployServiceInternalAsync(service, settings, log, branchOverride, vpsOverride, forceClean);
                 if (success) return true;
             }
             catch (Exception ex)
@@ -60,7 +61,8 @@ public class DeployLogic(
         AppSettings settings,
         LogCallback log,
         string? branchOverride = null,
-        VpsSettings? vpsOverride = null)
+        VpsSettings? vpsOverride = null,
+        bool forceClean = false)
     {
         var serviceId = service.Id;
 
@@ -76,7 +78,7 @@ public class DeployLogic(
 
         // Step 1 – git pull
         await log("INFO", $"📥 Pulling latest from Git ({repoUrl}, branch: {effectiveBranch})...", serviceId);
-        var pulled = await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath);
+        var pulled = await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean);
         if (!pulled)
         {
             await log("ERROR", "❌ Git pull failed.", serviceId);
@@ -85,7 +87,7 @@ public class DeployLogic(
         await log("SUCCESS", "✅ Git pull successful.", serviceId);
 
         // Step 2 – Build & Publish
-        var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl);
+        var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl, effectiveProjectPath);
         var projectFullPath = Path.Combine(repoLocalPath, effectiveProjectPath);
 
         var publishOutput = Path.Combine(

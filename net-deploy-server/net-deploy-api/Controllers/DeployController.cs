@@ -66,7 +66,7 @@ public class DeployController(
                 continue;
             }
 
-            var success = await deployLogic.DeployServiceAsync(service, settings, Log, config.Branch, vpsSettings);
+            var success = await deployLogic.DeployServiceAsync(service, settings, Log, config.Branch, vpsSettings, request.ForceClean);
             results.Add((service.Name, success));
 
             if (success)
@@ -106,5 +106,5 @@ public class DeployController(
         Ok(await deployLogsLogic.GetRecentSessionsAsync(count));
 
     public record ServiceDeploymentConfig(string ServiceId, string? Branch);
-    public record DeployRequest(List<ServiceDeploymentConfig> Services, string? EnvironmentId);
+    public record DeployRequest(List<ServiceDeploymentConfig> Services, string? EnvironmentId, bool ForceClean = false);
 }

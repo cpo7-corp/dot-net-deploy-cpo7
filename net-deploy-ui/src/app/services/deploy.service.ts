@@ -18,7 +18,7 @@ export class DeployService extends ApiService {
    * Triggers a deploy and returns an Observable that streams log entries
    * via Server-Sent Events (SSE).
    */
-  deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null): Observable<DeployLogEntry> {
+  deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null, forceClean: boolean = false): Observable<DeployLogEntry> {
     const subject = new Subject<DeployLogEntry>();
 
     // Since we must send a POST request with a body and then read the stream,
@@ -26,7 +26,7 @@ export class DeployService extends ApiService {
     fetch(`${this.baseUrl}/deploy`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ services, environmentId })
+      body: JSON.stringify({ services, environmentId, forceClean })
     }).then(async response => {
       if (!response.body) {
         throw new Error('No body returned from server.');

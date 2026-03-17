@@ -120,7 +120,7 @@
           <div style="width:44px"></div><!-- Spacer for center alignment -->
         </div>
 
-        <div class="card-body overflow-auto" id="logContainer" style="font-size: 0.9rem; line-height: 1.6;">
+        <div class="card-body terminal-body" id="logContainer" style="height: 600px; overflow-y: auto;">
           @if (logs().length === 0) {
           <div class="h-100 d-flex align-items-center justify-content-center text-secondary fst-italic">
             {{ 'DEPLOY.LOG_PLACEHOLDER' | translate }}
