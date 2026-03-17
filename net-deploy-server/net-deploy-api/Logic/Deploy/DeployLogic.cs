@@ -44,7 +44,7 @@ public class DeployLogic(
                 // Only use forceClean on the very first attempt of the batch.
                 // Subsequent retries should be incremental to save time.
                 var effectiveClean = attempt == 1 && forceClean;
-                var success = await DeployServiceInternalAsync(service, settings, log, branchOverride, vpsOverride, effectiveClean, skipPull, skipBuildIfOutputExists);
+                var success = await DeployServiceInternalAsync(service, settings, log, branchOverride, vpsOverride, effectiveClean, skipPull, skipBuildIfOutputExists || attempt > 1);
                 if (success) return true;
             }
             catch (Exception ex)
@@ -182,23 +182,39 @@ public class DeployLogic(
 
         try
         {
-            if (vpsOverride != null && !string.IsNullOrWhiteSpace(vpsOverride.Host) && vpsOverride.Host != "localhost" && vpsOverride.Host != "127.0.0.1")
+            const int maxTransferAttempts = 3;
+            for (int attempt = 1; attempt <= maxTransferAttempts; attempt++)
             {
-                await log("INFO", $"🚀 Uploading files to remote VPS: {vpsOverride.Host} at {targetPath}...", serviceId);
-                await UploadDirectoryToRemoteAsync(publishOutput, targetPath, vpsOverride, log, serviceId);
-                await log("SUCCESS", $"✅ Files uploaded to remote: {vpsOverride.Host}", serviceId);
-            }
-            else
-            {
-                await log("INFO", $"📂 Copying to: {targetPath} (local)", serviceId);
-                CopyDirectory(publishOutput, targetPath);
-                await log("SUCCESS", $"✅ Files copied locally to {targetPath}", serviceId);
+                try
+                {
+                    if (vpsOverride != null && !string.IsNullOrWhiteSpace(vpsOverride.Host) && vpsOverride.Host != "localhost" && vpsOverride.Host != "127.0.0.1")
+                    {
+                        if (attempt > 1) await log("WARNING", $"🔄 Retrying upload ({attempt}/{maxTransferAttempts})...", serviceId);
+                        else await log("INFO", $"🚀 Uploading files to remote VPS: {vpsOverride.Host} at {targetPath}...", serviceId);
+
+                        await UploadDirectoryToRemoteAsync(publishOutput, targetPath, vpsOverride, log, serviceId);
+                        await log("SUCCESS", $"✅ Files uploaded to remote: {vpsOverride.Host}", serviceId);
+                    }
+                    else
+                    {
+                        await log("INFO", $"📂 Copying to: {targetPath} (local)", serviceId);
+                        CopyDirectory(publishOutput, targetPath);
+                        await log("SUCCESS", $"✅ Files copied locally to {targetPath}", serviceId);
+                    }
+                    break; // Success
+                }
+                catch (Exception ex)
+                {
+                    if (attempt == maxTransferAttempts) throw;
+                    await log("WARNING", $"⚠️ Transfer attempt {attempt} failed: {ex.Message}. Retrying in 5s...", serviceId);
+                    await Task.Delay(5000);
+                }
             }
         }
         catch (Exception ex)
         {
             if (isWindowsService) await RunProcessAsync("sc.exe", $"start {service.IisSiteName}", ".", log, serviceId);
-            await log("ERROR", $"❌ Transfer failed: {ex.Message}", serviceId);
+            await log("ERROR", $"❌ Transfer failed after all attempts: {ex.Message}", serviceId);
             logger.LogError(ex, "Failed to copy/upload files to {Target}", targetPath);
             return false;
         }
@@ -317,7 +333,17 @@ public class DeployLogic(
     private async Task UploadDirectoryToRemoteAsync(string localPath, string remotePath, VpsSettings vps, LogCallback log, string? serviceId)
     {
         using var client = new SftpClient(vps.Host, vps.Port > 0 ? vps.Port : 22, vps.Username, vps.Password);
-        client.Connect();
+        client.ConnectionInfo.Timeout = TimeSpan.FromSeconds(30);
+
+        try
+        {
+            client.Connect();
+        }
+        catch (Exception ex)
+        {
+            // Just throw, the caller will handle logging and retrying
+            throw new Exception($"Failed to connect to SFTP at {vps.Host}:{vps.Port}. {ex.Message}");
+        }
 
         // Standardize remote path (Windows-style or Unix-style based on what the SFTP server expects)
         var root = remotePath.Replace("\\", "/");
