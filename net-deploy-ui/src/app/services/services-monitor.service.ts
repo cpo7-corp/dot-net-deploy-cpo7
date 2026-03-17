@@ -1,0 +1,26 @@
+import { Injectable } from '@angular/core';
+import { ApiService } from './api.service';
+import { ServiceDefinition, ServiceStatus } from '../models/api-models';
+import { Observable } from 'rxjs';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class ServicesMonitorService extends ApiService {
+
+  getAll(): Observable<ServiceStatus[]> {
+    return this.http.get<ServiceStatus[]>(`${this.baseUrl}/services`);
+  }
+
+  create(service: ServiceDefinition): Observable<ServiceDefinition> {
+    return this.http.post<ServiceDefinition>(`${this.baseUrl}/services`, service);
+  }
+
+  update(id: string, service: ServiceDefinition): Observable<ServiceDefinition> {
+    return this.http.put<ServiceDefinition>(`${this.baseUrl}/services/${id}`, service);
+  }
+
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/services/${id}`);
+  }
+}

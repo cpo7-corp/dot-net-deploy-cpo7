@@ -1,0 +1,34 @@
+.glass-panel {
+  background: rgba(30, 30, 30, 0.6);
+  backdrop-filter: blur(10px);
+}
+
+.page-title {
+  font-weight: 700;
+  background: linear-gradient(135deg, #fff 0%, #aaa 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.clickable-table {
+  tbody tr {
+    cursor: pointer;
+    transition: background 0.1s;
+    &:hover {
+      background: rgba(255, 255, 255, 0.05) !important;
+    }
+  }
+}
+
+.modal-content {
+  background: #1a1a1a !important;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.form-control, .form-select {
+  &:focus {
+    box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
+  }
+}

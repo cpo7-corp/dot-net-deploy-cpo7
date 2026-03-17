@@ -1,0 +1,95 @@
+<div class="container-fluid">
+  <h1 class="page-title mb-4">{{ 'SETTINGS.TITLE' | translate }}</h1>
+
+  @if (showLoading()) {
+    <div class="text-info">Loading configurations...</div>
+  } @else {
+    <div class="nav nav-pills mb-4 gap-2">
+      <button class="btn" [class.btn-primary]="activeTab() === 'git'" [class.btn-outline-secondary]="activeTab() !== 'git'" (click)="setTab('git')">
+        <i class="bi bi-git me-2"></i> Git
+      </button>
+      <button class="btn" [class.btn-primary]="activeTab() === 'vps'" [class.btn-outline-secondary]="activeTab() !== 'vps'" (click)="setTab('vps')">
+        <i class="bi bi-server me-2"></i> VPS
+      </button>
+    </div>
+
+    <form (ngSubmit)="saveGlobalSettings()">
+      
+      <!-- Git Tab -->
+      @if (activeTab() === 'git') {
+        <div class="card bg-dark text-white border-secondary glass-panel shadow-sm p-4 mb-4">
+          <h3 class="mb-4 d-flex align-items-center gap-2">
+            <i class="bi bi-git text-primary"></i> {{ 'SETTINGS.GIT_CONNECTION' | translate }}
+          </h3>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">{{ 'SETTINGS.GIT_TOKEN' | translate }}</label>
+              <input type="password" class="form-control bg-dark text-white border-secondary" [(ngModel)]="settings().git.token" name="g_token" placeholder="github_pat_...">
+            </div>
+            <div class="col-12">
+              <label class="form-label">{{ 'SETTINGS.LOCAL_CLONE_PATH' | translate }}</label>
+              <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="settings().git.localBaseDir" name="g_localBaseDir" required>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- VPS Tab -->
+      @if (activeTab() === 'vps') {
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h3 class="mb-0 text-white"><i class="bi bi-server text-info me-2"></i> VPS Environments</h3>
+          <button type="button" class="btn btn-sm btn-success" (click)="addVpsEnvironment()">
+            <i class="bi bi-plus-lg me-1"></i> Add Environment
+          </button>
+        </div>
+
+        @for (vps of settings().vpsEnvironments; track $index) {
+          <div class="card bg-dark text-white border-secondary glass-panel shadow-sm p-4 mb-3 position-relative">
+            <button type="button" class="btn btn-outline-danger btn-sm border-0 position-absolute top-0 end-0 m-3" 
+                    (click)="removeVpsEnvironment($index)" title="Delete Environment">
+              <i class="bi bi-trash-fill fs-5"></i>
+            </button>
+            <div class="row g-3">
+              <div class="col-md-12">
+                <label class="form-label">Environment Name</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.name" [name]="'v_name_' + $index" placeholder="e.g. Production" required>
+              </div>
+              <div class="col-md-9">
+                <label class="form-label">{{ 'SETTINGS.HOST' | translate }}</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.host" [name]="'v_host_' + $index" placeholder="1.2.3.4" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">{{ 'SETTINGS.PORT' | translate }}</label>
+                <input type="number" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.port" [name]="'v_port_' + $index" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ 'SETTINGS.USERNAME' | translate }}</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.username" [name]="'v_username_' + $index" required>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">{{ 'SETTINGS.PASSWORD' | translate }}</label>
+                <input type="password" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.password" [name]="'v_password_' + $index">
+              </div>
+            </div>
+          </div>
+        }
+
+        @if (settings().vpsEnvironments.length === 0) {
+          <div class="alert alert-info border-secondary bg-dark text-info">
+            No VPS environments added yet. Click "Add Environment" to get started.
+          </div>
+        }
+      }
+
+      <!-- Footer Actions -->
+      <div class="d-flex align-items-center gap-3 mt-4 mb-5">
+        <button type="submit" class="btn btn-primary btn-lg px-5 shadow" [disabled]="saving()">
+          <i class="bi bi-save me-2"></i> {{ 'SETTINGS.BTN_SAVE_CHANGES' | translate }}
+        </button>
+        @if (successMsg()) {
+          <span class="text-success fw-bold animate-fade-in"><i class="bi bi-check2-circle me-1"></i> {{ 'SETTINGS.SAVED_SUCCESS' | translate }}</span>
+        }
+      </div>
+    </form>
+  }
+</div>

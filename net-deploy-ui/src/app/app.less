@@ -1,0 +1,56 @@
+/* Global layout styles */
+.app-layout {
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: var(--bg-primary);
+  border-right: 1px solid var(--bg-surface-border);
+  transition: var(--transition);
+}
+
+.main-content {
+  background-color: #09090b; /* Very dark background */
+  height: 100vh;
+}
+
+.logo-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 0.5rem;
+}
+
+[dir="rtl"] .logo-icon {
+  margin-right: 0;
+  margin-left: 0.5rem;
+}
+
+/* Sidebar Links */
+.nav-link {
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  transform: translateX(4px);
+}
+
+[dir="rtl"] .nav-link:hover {
+  transform: translateX(-4px);
+}
+
+.nav-link.active {
+  background-color: rgba(99, 102, 241, 0.15) !important;
+  color: #a5b4fc !important;
+  border-left: 3px solid var(--primary);
+}
+
+[dir="rtl"] .nav-link.active {
+  border-left: none;
+  border-right: 3px solid var(--primary);
+}

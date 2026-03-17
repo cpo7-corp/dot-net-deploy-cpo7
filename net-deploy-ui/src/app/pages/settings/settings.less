@@ -1,0 +1,61 @@
+.tabs {
+  display: flex;
+  gap: 1rem;
+  border-bottom: 1px solid var(--bg-surface-border);
+  padding-bottom: 1rem;
+}
+
+.tabs button {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.tabs button:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+}
+
+.tabs button.active {
+  color: var(--primary);
+  background: var(--primary-faint);
+  border-color: rgba(99, 102, 241, 0.3);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.success-msg {
+  color: var(--secondary);
+  font-weight: 500;
+  animation: fadein 0.3s ease;
+}
+
+.input-with-select {
+  display: flex;
+  gap: 0.5rem;
+  
+  input {
+    flex: 2;
+  }
+  select {
+    flex: 1;
+    background: var(--bg-surface-hover);
+  }
+}
+
+.new-service-panel {
+  border-left: 4px solid var(--secondary);
+}
+
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}

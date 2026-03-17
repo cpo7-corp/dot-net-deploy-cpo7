@@ -1,0 +1,52 @@
+<div class="container-fluid">
+  <h1 class="page-title mb-4">{{ 'DASHBOARD.TITLE' | translate }}</h1>
+
+  @if (loading()) {
+  <div class="alert alert-info shadow-sm glass-panel">
+    {{ 'DASHBOARD.LOADING' | translate }}
+  </div>
+  }
+
+  @if (!loading()) {
+  <div class="row g-4 services-grid">
+    
+    <!-- Empty State -->
+    @if (services().length === 0) {
+    <div class="col-12">
+      <div class="card bg-dark border text-white text-center p-5 glass-panel empty-state">
+        <h3 class="mb-3">{{ 'DASHBOARD.NO_SERVICES' | translate }}</h3>
+        <p class="text-secondary">{{ 'DASHBOARD.NO_SERVICES_DESC' | translate }}</p>
+      </div>
+    </div>
+    }
+
+    @for (service of services(); track service.id) {
+      <div class="col-md-6 col-lg-4 col-xl-3">
+        <div class="card h-100 bg-dark text-white border-secondary glass-panel service-card shadow">
+          <div class="card-header border-bottom border-secondary d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 text-truncate service-name" style="max-width: 60%">{{ service.name }}</h5>
+            <span class="badge" [ngClass]="service.status === 'Running' ? 'bg-success' : (service.status === 'Stopped' ? 'bg-danger' : 'bg-secondary')">
+              {{ service.status ? ('DASHBOARD.' + (service.status | uppercase) | translate) : ('DASHBOARD.UNKNOWN' | translate) }}
+            </span>
+          </div>
+          
+          <div class="card-body service-details d-flex flex-column gap-2">
+            <div class="d-flex justify-content-between border-bottom border-secondary pb-1">
+              <small class="text-secondary text-uppercase fw-bold">{{ 'DASHBOARD.TYPE' | translate }}</small>
+              <span class="fw-semibold">{{ 'DASHBOARD.TYPES.' + service.serviceType | translate }}</span>
+            </div>
+            <div class="d-flex justify-content-between border-bottom border-secondary pb-1">
+              <small class="text-secondary text-uppercase fw-bold">{{ 'DASHBOARD.IIS_SITE' | translate }}</small>
+              <span class="fw-semibold">{{ service.iisSiteName || ('DASHBOARD.UNKNOWN' | translate) }}</span>
+            </div>
+            <div class="d-flex justify-content-between pt-1">
+              <small class="text-secondary text-uppercase fw-bold">{{ 'DASHBOARD.LAST_DEPLOY' | translate }}</small>
+              <span class="fw-semibold">{{ service.lastDeployed ? (service.lastDeployed | date:'short') : ('DASHBOARD.NEVER' | translate) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+  }
+</div>
