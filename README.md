@@ -46,4 +46,12 @@ NET Deploy is a powerful tool designed to automate the process of pulling, build
 
 ---
 
+## Disclaimer & Warranty
+
+**THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND**, EXPRESS OR IMPLIED. IN NO EVENT SHALL CPO7 BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+**Use of this software is at your own risk.** CPO7 is not responsible for any damage, data loss, or system failure caused by the software.
+
+---
+
 **© 2026 CPO7 - PROPRIETARY SOFTWARE. Free for learning, paid for commercial use.**
