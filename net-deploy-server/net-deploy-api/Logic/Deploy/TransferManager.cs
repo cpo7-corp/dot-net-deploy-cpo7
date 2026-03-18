@@ -43,43 +43,56 @@ public class TransferManager
 
     private async Task UploadDirectoryToRemoteAsync(string localPath, string remotePath, VpsSettings vps, LogCallback log, string? serviceId)
     {
-        using var client = new SftpClient(vps.Host, vps.Port > 0 ? vps.Port : 22, vps.Username, vps.Password);
-        client.ConnectionInfo.Timeout = TimeSpan.FromSeconds(30);
+        await log("INFO", $"[SFTP] Attempting connect to Host: '{vps.Host}', Username: '{vps.Username}'", serviceId);
+
+        var connectionInfo = new Renci.SshNet.ConnectionInfo(vps.Host, vps.Port > 0 ? vps.Port : 22, vps.Username,
+            new PasswordAuthenticationMethod(vps.Username, vps.Password),
+            new KeyboardInteractiveAuthenticationMethod(vps.Username));
+
+        var kbdAuth = connectionInfo.AuthenticationMethods.OfType<KeyboardInteractiveAuthenticationMethod>().FirstOrDefault();
+        if (kbdAuth != null)
+        {
+            kbdAuth.AuthenticationPrompt += (sender, e) =>
+            {
+                foreach (var prompt in e.Prompts)
+                {
+                    prompt.Response = vps.Password;
+                }
+            };
+        }
 
         try
         {
+            using var client = new SftpClient(connectionInfo);
+            client.HostKeyReceived += (sender, e) => e.CanTrust = true;
+            client.ConnectionInfo.Timeout = TimeSpan.FromSeconds(20);
+            
             client.Connect();
+            
+            var root = remotePath.Replace("\\", "/");
+            async Task UploadSf(string localDir, string remoteDir)
+            {
+                if (!client.Exists(remoteDir)) EnsureRemoteDirectory(client, remoteDir);
+                foreach (var file in Directory.GetFiles(localDir))
+                {
+                    using var fs = File.OpenRead(file);
+                    client.UploadFile(fs, remoteDir + "/" + Path.GetFileName(file));
+                }
+                foreach (var subDir in Directory.GetDirectories(localDir))
+                {
+                    await UploadSf(subDir, remoteDir + "/" + Path.GetFileName(subDir));
+                }
+            }
+
+            await UploadSf(localPath, root);
+            client.Disconnect();
+            return;
         }
         catch (Exception ex)
         {
-            throw new Exception($"Failed to connect to SFTP at {vps.Host}:{vps.Port}. {ex.Message}");
+            await log("ERROR", $"SFTP connection failed: {ex.Message}", serviceId);
+            throw;
         }
-
-        var root = remotePath.Replace("\\", "/");
-
-        async Task Upload(string localDir, string remoteDir)
-        {
-            if (!client.Exists(remoteDir))
-            {
-                EnsureRemoteDirectory(client, remoteDir);
-            }
-
-            foreach (var file in Directory.GetFiles(localDir))
-            {
-                using var fs = File.OpenRead(file);
-                var dest = remoteDir + "/" + Path.GetFileName(file);
-                client.UploadFile(fs, dest);
-            }
-
-            foreach (var subDir in Directory.GetDirectories(localDir))
-            {
-                var dirName = Path.GetFileName(subDir);
-                await Upload(subDir, remoteDir + "/" + dirName);
-            }
-        }
-
-        await Upload(localPath, root);
-        client.Disconnect();
     }
 
     private void EnsureRemoteDirectory(SftpClient client, string path)
@@ -109,4 +122,6 @@ public class TransferManager
             }
         }
     }
+
+
 }

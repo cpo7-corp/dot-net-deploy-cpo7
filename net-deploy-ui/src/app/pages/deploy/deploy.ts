@@ -137,7 +137,7 @@ export class DeployComponent implements OnInit {
       branch: this.serviceBranches[id] || 'main'
     }));
 
-    this.startDeploy(configs, false, false, false);
+    this.startDeploy(configs, false, false, true);
   }
 
   getLogClass(level: string): string {
