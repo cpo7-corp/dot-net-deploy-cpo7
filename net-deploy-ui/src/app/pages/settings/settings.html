@@ -2,14 +2,14 @@
   <h1 class="page-title mb-4">{{ 'configSettingsTitle' | translate }}</h1>
 
   @if (showLoading()) {
-    <div class="text-info">Loading configurations...</div>
+    <div class="text-info">{{ 'loading' | translate }}</div>
   } @else {
     <div class="nav nav-pills mb-4 gap-2">
       <button class="btn" [class.btn-primary]="activeTab() === 'git'" [class.btn-outline-secondary]="activeTab() !== 'git'" (click)="setTab('git')">
-        <i class="bi bi-git me-2"></i> Git
+        <i class="bi bi-git me-2"></i> {{ 'git' | translate }}
       </button>
       <button class="btn" [class.btn-primary]="activeTab() === 'vps'" [class.btn-outline-secondary]="activeTab() !== 'vps'" (click)="setTab('vps')">
-        <i class="bi bi-server me-2"></i> VPS
+        <i class="bi bi-server me-2"></i> {{ 'vps' | translate }}
       </button>
       <button class="btn" [class.btn-primary]="activeTab() === 'database'" [class.btn-outline-secondary]="activeTab() !== 'database'" (click)="setTab('database')">
         <i class="bi bi-database me-2"></i> {{ 'database' | translate }}
@@ -40,31 +40,31 @@
       <!-- VPS Tab -->
       @if (activeTab() === 'vps') {
         <div class="d-flex justify-content-between align-items-center mb-3">
-          <h3 class="mb-0 text-white"><i class="bi bi-server text-info me-2"></i> VPS Environments</h3>
+          <h3 class="mb-0 text-white"><i class="bi bi-server text-info me-2"></i> {{ 'vpsEnvironments' | translate }}</h3>
           <button type="button" class="btn btn-sm btn-success" (click)="addVpsEnvironment()">
-            <i class="bi bi-plus-lg me-1"></i> Add Environment
+            <i class="bi bi-plus-lg me-1"></i> {{ 'addEnvironment' | translate }}
           </button>
         </div>
 
         @for (vps of settings().vpsEnvironments; track $index) {
           <div class="card bg-dark text-white border-secondary glass-panel shadow-sm p-4 mb-3 position-relative">
             <button type="button" class="btn btn-outline-danger btn-sm border-0 position-absolute top-0 end-0 m-3" 
-                    (click)="removeVpsEnvironment($index)" title="Delete Environment">
+                    (click)="removeVpsEnvironment($index)" [title]="'deleteEnvironment' | translate">
               <i class="bi bi-trash-fill fs-5"></i>
             </button>
             <div class="row g-3">
               <div class="col-md-5">
-                <label class="form-label">Environment Name</label>
-                <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.name" [name]="'v_name_' + $index" placeholder="e.g. Production" required>
+                <label class="form-label">{{ 'environmentName' | translate }}</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.name" [name]="'v_name_' + $index" [placeholder]="'environmentName' | translate" required>
               </div>
               <div class="col-md-3">
-                <label class="form-label text-warning small">Auto-Rename Tag</label>
+                <label class="form-label text-warning small">{{ 'autoRenameTag' | translate }}</label>
                 <input type="text" class="form-control bg-dark text-white border-secondary border-warning border-opacity-50" [(ngModel)]="vps.environmentTag" [name]="'v_tag_' + $index" placeholder="e.g. prod">
               </div>
               <div class="col-md-4 d-flex align-items-end">
                 <div class="form-check form-switch mb-2">
                   <input class="form-check-input" type="checkbox" role="switch" [id]="'isLocal_' + $index" [(ngModel)]="vps.isLocal" [name]="'v_isLocal_' + $index">
-                  <label class="form-check-label text-info" [for]="'isLocal_' + $index">Local Server (Skip SFTP)</label>
+                  <label class="form-check-label text-info" [for]="'isLocal_' + $index">{{ 'localServerSkipSftp' | translate }}</label>
                 </div>
               </div>
 
@@ -88,7 +88,7 @@
               } @else {
                 <div class="col-12">
                   <div class="p-2 border border-info border-opacity-25 rounded bg-info bg-opacity-10 text-info">
-                    <i class="bi bi-info-circle me-2"></i> Deployment will copy files directly to the target path without SFTP.
+                    <i class="bi bi-info-circle me-2"></i> {{ 'localCopyInfo' | translate }}
                   </div>
                 </div>
               }
@@ -96,19 +96,19 @@
               <!-- Shared Variables Section -->
               <div class="col-12 mt-4">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h5 class="text-warning mb-0"><i class="bi bi-braces me-2"></i> Shared Variables (appsettings.json)</h5>
+                  <h5 class="text-warning mb-0"><i class="bi bi-braces me-2"></i> {{ 'sharedVariablesAppSettings' | translate }}</h5>
                   <button type="button" class="btn btn-sm btn-outline-warning" (click)="addSharedVariable(vps)">
-                    <i class="bi bi-plus-lg"></i> Add Shared Variable
+                    <i class="bi bi-plus-lg"></i> {{ 'addSharedVariable' | translate }}
                   </button>
                 </div>
                 <div class="border border-secondary border-opacity-25 rounded p-3 bg-black bg-opacity-25">
                   @for (v of vps.sharedVariables; track $index) {
                     <div class="row g-2 mb-2 align-items-center">
                       <div class="col-md-5">
-                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="v.key" [name]="'sv_key_'+$index+'_'+vps.id" placeholder="Key (e.g. DbConnection)">
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="v.key" [name]="'sv_key_'+$index+'_'+vps.id" [placeholder]="'name' | translate">
                       </div>
                       <div class="col-md-6">
-                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="v.value" [name]="'sv_val_'+$index+'_'+vps.id" placeholder="Value">
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="v.value" [name]="'sv_val_'+$index+'_'+vps.id" [placeholder]="'value' | translate">
                       </div>
                       <div class="col-md-1 text-end">
                         <button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="removeSharedVariable(vps, $index)"><i class="bi bi-x-circle-fill"></i></button>
@@ -116,7 +116,7 @@
                     </div>
                   }
                   @if (!vps.sharedVariables?.length) {
-                    <div class="text-secondary small fst-italic">No shared variables defined. These apply to ALL services in this environment.</div>
+                    <div class="text-secondary small fst-italic">{{ 'sharedVariablesDescription' | translate }}</div>
                   }
                 </div>
               </div>
@@ -124,9 +124,9 @@
               <!-- Shared File Renames Section -->
               <div class="col-12 mt-4">
                 <div class="d-flex justify-content-between align-items-center mb-2">
-                  <h5 class="text-info mb-0"><i class="bi bi-files me-2"></i> Shared File Overwrites (e.g. shared-settings.json)</h5>
+                  <h5 class="text-info mb-0"><i class="bi bi-files me-2"></i> {{ 'sharedFileOverwrites' | translate }}</h5>
                   <button type="button" class="btn btn-sm btn-outline-info" (click)="addSharedFileRename(vps)">
-                    <i class="bi bi-plus-lg"></i> Add Shared Overwrite
+                    <i class="bi bi-plus-lg"></i> {{ 'addSharedOverwrite' | translate }}
                   </button>
                 </div>
                 <div class="border border-secondary border-opacity-25 rounded p-3 bg-black bg-opacity-25">
@@ -144,7 +144,7 @@
                     </div>
                   }
                   @if (!vps.sharedFileRenames?.length) {
-                    <div class="text-secondary small fst-italic">No shared file overwrites defined. For example, copy a shared config file to all services.</div>
+                    <div class="text-secondary small fst-italic">{{ 'sharedFileOverwritesDescription' | translate }}</div>
                   }
                 </div>
               </div>
@@ -155,7 +155,7 @@
 
         @if (settings().vpsEnvironments.length === 0) {
           <div class="alert alert-info border-secondary bg-dark text-info">
-            No VPS environments added yet. Click "Add Environment" to get started.
+            {{ 'noVpsEnvironmentsMsg' | translate }}
           </div>
         }
       }

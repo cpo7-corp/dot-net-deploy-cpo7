@@ -3,7 +3,7 @@
     <h1 class="page-title mb-0">{{ 'deployServices' | translate }}</h1>
 
     <div class="d-flex align-items-center gap-2">
-      <label class="text-secondary small mb-0">Environment:</label>
+      <label class="text-secondary small mb-0">{{ 'environment' | translate }}</label>
       <select class="form-select form-select-sm bg-dark text-white border-secondary w-auto"
         [ngModel]="selectedEnvironmentId()"
         (ngModelChange)="selectedEnvironmentId.set($event); onEnvironmentChange($event)" [disabled]="deploying()">
@@ -21,10 +21,8 @@
         <div class="card-header border-bottom border-secondary d-flex justify-content-between align-items-center py-3">
           <h4 class="mb-0">{{ 'selectServices' | translate }}</h4>
           <div class="btn-group btn-group-sm">
-            <button class="btn btn-outline-light" type="button" (click)="selectAll()">{{ 'DEPLOY.ALL' | translate
-              }}</button>
-            <button class="btn btn-outline-light" type="button" (click)="clearSelection()">{{ 'DEPLOY.NONE' | translate
-              }}</button>
+            <button class="btn btn-outline-light" type="button" (click)="selectAll()">{{ 'all' | translate }}</button>
+            <button class="btn btn-outline-light" type="button" (click)="clearSelection()">{{ 'none' | translate }}</button>
           </div>
         </div>
 
@@ -55,7 +53,7 @@
                 </div>
                 <span class="badge"
                   [ngClass]="s.status === 'Running' ? 'bg-success' : (s.status === 'Stopped' ? 'bg-danger' : 'bg-secondary')">
-                  {{ s.status ? (s.status | lowercase | translate) : ('unknown' | translate) }}
+                  {{ (s.status ? (s.status | lowercase) : 'unknown') | translate }}
                 </span>
               </div>
 
@@ -63,7 +61,7 @@
               <div class="px-3 pb-3 pt-0 ms-5 me-3">
                 <div class="input-group input-group-sm">
                   <span class="input-group-text bg-dark border-secondary text-secondary"
-                    style="font-size: 0.7rem;">Branch</span>
+                    style="font-size: 0.7rem;">{{ 'branch' | translate }}</span>
                   <input type="text" class="form-control bg-dark text-white border-secondary"
                     [(ngModel)]="serviceBranches[s.id!]" [disabled]="deploying()">
                 </div>
@@ -76,7 +74,7 @@
         </div>
         <div class="card-footer border-top border-secondary p-3">
           <div class="mb-4 mt-2 px-1">
-            <h6 class="text-secondary small mb-3">Deployment Strategy</h6>
+            <h6 class="text-secondary small mb-3">{{ 'deploymentStrategy' | translate }}</h6>
 
             <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" id="checkPull"
@@ -133,7 +131,7 @@
           @if (failedServiceIds().length > 0 && !deploying()) {
           <button class="btn btn-outline-danger w-100 mt-2 py-2 fw-bold" (click)="retryFailed()">
             <i class="bi bi-arrow-clockwise me-2"></i>
-            Retry Failed ({{failedServiceIds().length}})
+            {{ 'retryFailed' | translate }} ({{failedServiceIds().length}})
           </button>
           }
         </div>
@@ -151,7 +149,7 @@
           </div>
           <div class="text-secondary mx-auto fw-semibold small d-flex align-items-center gap-2">
             <i class="bi bi-terminal me-1"></i>
-            {{ 'DEPLOY.TERMINAL_TITLE' | translate }}
+            {{ 'liveTerminalTitle' | translate }}
             @if (deploying()) {
             <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 ms-2"
               style="font-size: 0.7rem;">
@@ -164,7 +162,7 @@
           <div style="width:44px"></div><!-- Spacer for center alignment -->
         </div>
 
-        <div class="card-body terminal-body" id="logContainer" style="height: 600px; overflow-y: auto;">
+        <div class="card-body terminal-body" id="logContainer" style="height: 600px; overflow-y: auto; direction: ltr; text-align: left;">
           @if (logs().length === 0) {
           <div class="h-100 d-flex align-items-center justify-content-center text-secondary fst-italic">
             {{ 'logPlaceholder' | translate }}
@@ -190,16 +188,16 @@
       <div class="card bg-black text-white border-secondary h-100 font-monospace shadow-lg mt-3"
         *ngIf="objectKeys(deploymentProgress()).length > 0">
         <div class="card-header bg-dark border-bottom border-secondary d-flex align-items-center py-2">
-          <h6 class="mb-0 small fw-bold text-secondary">Live Deployment Status</h6>
+          <h6 class="mb-0 small fw-bold text-secondary">{{ 'liveDeploymentStatus' | translate }}</h6>
         </div>
         <div class="card-body p-0">
           <table class="table table-dark table-sm mb-0 align-middle small table-hover">
             <thead class="text-secondary opacity-50">
               <tr>
-                <th class="ps-3 py-2">Service Name</th>
-                <th class="text-center">Build</th>
-                <th class="text-center">Deployed</th>
-                <th class="text-center">Heartbeat</th>
+                <th class="ps-3 py-2">{{ 'serviceName' | translate }}</th>
+                <th class="text-center">{{ 'build' | translate }}</th>
+                <th class="text-center">{{ 'deployed' | translate }}</th>
+                <th class="text-center">{{ 'heartbeat' | translate }}</th>
               </tr>
             </thead>
             <tbody>
