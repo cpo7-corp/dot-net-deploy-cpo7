@@ -16,6 +16,7 @@ export interface VpsSettings {
   username: string;
   password?: string;
   port: number;
+  isLocal: boolean;
 }
 
 export interface ServiceDefinition {
@@ -27,6 +28,8 @@ export interface ServiceDefinition {
   serviceType: 'WebApi' | 'Mvc' | 'WindowsService' | 'Angular' | 'React';
   enabled: boolean;
   branch: string;
+  compileSingleFile: boolean;
+  heartbeatUrl: string;
   deployTargetPath: string;
   lastDeployed?: string | Date;
   _saved?: boolean; // UI state only

@@ -126,15 +126,19 @@ public class DeployLogic(
 
         if (isWindowsService)
             await ManageWindowsServiceAsync(service.IisSiteName, "stop", log, serviceId);
+        else if (service.ServiceType is "WebApi" or "Mvc")
+            await ManageIisSiteAsync(service.IisSiteName, "stop", log, serviceId);
 
         await log("INFO", $"🔨 Building & publishing: {effectiveProjectPath}", serviceId);
         
-        bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, log, serviceId);
+        bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, serviceId);
 
         if (!buildSuccess)
         {
             if (isWindowsService) 
                 await ManageWindowsServiceAsync(service.IisSiteName, "start", log, serviceId);
+            else if (service.ServiceType is "WebApi" or "Mvc")
+                await ManageIisSiteAsync(service.IisSiteName, "start", log, serviceId);
             
             await log("ERROR", "❌ Build/publish failed.", serviceId);
             return false;
@@ -163,6 +167,8 @@ public class DeployLogic(
         {
             if (isWindowsService) 
                 await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id);
+            else if (service.ServiceType is "WebApi" or "Mvc")
+                await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id);
             
             await log("ERROR", $"❌ Transfer failed after all attempts: {ex.Message}", service.Id);
             logger.LogError(ex, "Failed to copy/upload files to {Target}", targetPath);
@@ -171,8 +177,16 @@ public class DeployLogic(
 
         if (isWindowsService)
             await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id);
+        else if (service.ServiceType is "WebApi" or "Mvc")
+            await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id);
 
         await log("SUCCESS", $"🚀 Deploy complete for: {service.Name}", service.Id);
+        
+        if (!string.IsNullOrWhiteSpace(service.HeartbeatUrl))
+        {
+            await CheckHeartbeatAsync(service.HeartbeatUrl, log, service.Id);
+        }
+
         return true;
     }
 
@@ -182,6 +196,40 @@ public class DeployLogic(
         await log("INFO", $"{actionIcon} Windows Service: {iisSiteName}...", serviceId);
         await processRunner.RunAsync("sc.exe", $"{action} {iisSiteName}", ".", log, serviceId);
         if (action == "stop") await Task.Delay(2000); 
+    }
+
+    private async Task ManageIisSiteAsync(string? iisSiteName, string action, LogCallback log, string? serviceId)
+    {
+        var actionIcon = action == "start" ? "🏁 Starting" : "🛑 Stopping";
+        await log("INFO", $"{actionIcon} IIS Site: {iisSiteName}...", serviceId);
+        var appcmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"inetsrv\appcmd.exe");
+        if (!File.Exists(appcmd)) appcmd = "appcmd.exe"; // Fallback to path
+
+        await processRunner.RunAsync(appcmd, $"{action} site \"{iisSiteName}\"", ".", log, serviceId);
+        if (action == "stop") await Task.Delay(2000);
+    }
+
+    private async Task CheckHeartbeatAsync(string url, LogCallback log, string? serviceId)
+    {
+        await log("INFO", $"💓 Checking heartbeat: {url} ...", serviceId);
+        try
+        {
+            using var client = new HttpClient();
+            client.Timeout = TimeSpan.FromSeconds(15);
+            var response = await client.GetAsync(url);
+            if (response.IsSuccessStatusCode)
+            {
+                await log("SUCCESS", $"✅ Heartbeat OK! Status: {response.StatusCode}", serviceId);
+            }
+            else
+            {
+                await log("WARNING", $"⚠️ Heartbeat returned error: {response.StatusCode}", serviceId);
+            }
+        }
+        catch (Exception ex)
+        {
+            await log("ERROR", $"❌ Heartbeat failed: {ex.Message}", serviceId);
+        }
     }
 
     private static string GetEffectiveBranch(ServiceDefinition service, string parsedBranch, string? branchOverride)

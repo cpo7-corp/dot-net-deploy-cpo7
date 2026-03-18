@@ -18,16 +18,29 @@ public class DeployLogsLogic(MongoDbContext db)
             .SortBy(e => e.Timestamp)
             .ToListAsync();
 
-    public async Task<List<string>> GetRecentSessionsAsync(int count = 10)
+    public record SessionSummary(string SessionId, DateTime Timestamp, bool HasErrors);
+
+    public async Task<List<SessionSummary>> GetSessionsPagedAsync(int skip, int limit)
     {
         var pipeline = db.DeployLogs.Aggregate()
             .Group(
                 e => e.SessionId,
-                g => new { SessionId = g.Key, LastRun = g.Max(x => x.Timestamp) })
+                g => new { 
+                    SessionId = g.Key, 
+                    LastRun = g.Max(x => x.Timestamp),
+                    ErrorCount = g.Count(x => x.Level == "ERROR")
+                })
             .SortByDescending(g => g.LastRun)
-            .Limit(count);
+            .Skip(skip)
+            .Limit(limit);
 
         var result = await pipeline.ToListAsync();
-        return result.Select(r => r.SessionId).ToList();
+        return result.Select(r => new SessionSummary(r.SessionId, r.LastRun, r.ErrorCount > 0)).ToList();
+    }
+
+    public async Task<List<string>> GetRecentSessionsAsync(int count = 10)
+    {
+        var summaries = await GetSessionsPagedAsync(0, count);
+        return summaries.Select(s => s.SessionId).ToList();
     }
 }

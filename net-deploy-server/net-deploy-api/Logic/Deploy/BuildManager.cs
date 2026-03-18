@@ -2,13 +2,13 @@ namespace NET.Deploy.Api.Logic.Deploy;
 
 public class BuildManager(ProcessRunner processRunner)
 {
-    public async Task<bool> BuildAsync(string projectPath, string outputPath, string serviceType, LogCallback log, string? serviceId)
+    public async Task<bool> BuildAsync(string projectPath, string outputPath, string serviceType, bool compileSingleFile, LogCallback log, string? serviceId)
     {
         var isNode = serviceType is "Angular" or "React" || projectPath.EndsWith("package.json");
 
         return isNode 
             ? await RunNpmBuildAsync(projectPath, outputPath, log, serviceId, serviceType)
-            : await RunDotnetPublishAsync(projectPath, outputPath, log, serviceId);
+            : await RunDotnetPublishAsync(projectPath, outputPath, compileSingleFile, log, serviceId);
     }
 
     private async Task<bool> RunNpmBuildAsync(string projectPath, string outputPath, LogCallback log, string? serviceId, string serviceType)
@@ -51,10 +51,15 @@ public class BuildManager(ProcessRunner processRunner)
         return false;
     }
 
-    private async Task<bool> RunDotnetPublishAsync(string projectPath, string outputPath, LogCallback log, string? serviceId)
+    private async Task<bool> RunDotnetPublishAsync(string projectPath, string outputPath, bool compileSingleFile, LogCallback log, string? serviceId)
     {
         var projectDir = Directory.Exists(projectPath) ? projectPath : Path.GetDirectoryName(projectPath)!;
         var args = $"publish \"{projectPath}\" -c Release -o \"{outputPath}\" --nologo";
+
+        if (compileSingleFile)
+        {
+            args += " -p:PublishSingleFile=true -r win-x64 --self-contained true";
+        }
         
         await log("INFO", $"🏗️ Running dotnet publish in: {projectDir}", serviceId);
         return await processRunner.RunAsync("dotnet", args, projectDir, log, serviceId);

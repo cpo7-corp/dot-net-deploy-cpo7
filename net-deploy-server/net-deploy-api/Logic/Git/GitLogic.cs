@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using NET.Deploy.Api.Logic.Settings.Entities;
+using System.Diagnostics;
 
 namespace NET.Deploy.Api.Logic.Git;
 
@@ -10,17 +10,20 @@ public class GitLogic(ILogger<GitLogic> logger)
     /// </summary>
     public async Task<bool> PullAsync(GitSettings git, string repoUrl, string branch, Deploy.LogCallback? log = null, string? sparsePath = null, bool forceClean = false)
     {
-        var repoDirName = GetSafeRepoName(repoUrl, sparsePath);
+        var repoDirName = GetSafeRepoName(repoUrl);
         var repoPath = Path.Combine(git.LocalBaseDir, repoDirName);
         var authUrl = BuildAuthUrl(git, repoUrl);
 
         // 1. Force Clean Logic
         if (Directory.Exists(repoPath) && forceClean)
         {
-            try {
+            try
+            {
                 if (log != null) await log("INFO", $"🧹 [Clean] Deleting existing directory to ensure fresh clone...");
                 DeleteDirectoryRecursively(repoPath);
-            } catch (Exception ex) {
+            }
+            catch (Exception ex)
+            {
                 if (log != null) await log("WARNING", $"Could not fully clear folder (files might be in use): {ex.Message}");
                 // If we can't clear it but want a fresh clone, we have a problem. 
                 // However, we'll try to let git handle it or fail later.
@@ -32,9 +35,12 @@ public class GitLogic(ILogger<GitLogic> logger)
         {
             if (Directory.Exists(repoPath))
             {
-                try { 
-                    DeleteDirectoryRecursively(repoPath); 
-                } catch (Exception ex) {
+                try
+                {
+                    DeleteDirectoryRecursively(repoPath);
+                }
+                catch (Exception ex)
+                {
                     if (log != null) await log("ERROR", "❌ Cannot clone: Target folder exists and is not a git repo, and cannot be deleted. Try manual cleanup.");
                     return false;
                 }
@@ -43,34 +49,26 @@ public class GitLogic(ILogger<GitLogic> logger)
             logger.LogInformation("Cloning repo {Url} into {Path}", repoUrl, repoPath);
             if (log != null) await log("INFO", $"📥 Starting fresh clone (branch: {branch})...");
             Directory.CreateDirectory(repoPath);
-            
-            var cloneArgs = !string.IsNullOrWhiteSpace(sparsePath) 
-                ? $"clone -b {branch} --filter=blob:none --sparse {authUrl} ." 
-                : $"clone -b {branch} {authUrl} .";
+
+            var cloneArgs = $"clone -b {branch} {authUrl} .";
 
             if (!await RunGitAsync(repoPath, cloneArgs, "Cloning", log))
                 return false;
 
-            if (!string.IsNullOrWhiteSpace(sparsePath))
-            {
-                if (log != null) await log("INFO", $"🎯 Setting sparse-checkout for: {sparsePath}");
-                await RunGitAsync(repoPath, $"sparse-checkout set {sparsePath}", "Sparse-Checkout", log);
-            }
-            
             return true;
         }
 
         // 3. Incremental Update Logic
         logger.LogInformation("Updating existing repo from branch {Branch} in {Repo}", branch, repoUrl);
         if (log != null) await log("INFO", $"♻️ Updating existing repo (incremental pull)...");
-        
+
         // Clean any local locks/index issues if they exist
         var lockFile = Path.Combine(repoPath, ".git", "index.lock");
         if (File.Exists(lockFile)) File.Delete(lockFile);
 
         if (!await RunGitAsync(repoPath, "fetch --all", "Fetch", log))
             return false;
-            
+
         return await RunGitAsync(repoPath, $"reset --hard origin/{branch}", "Reset", log);
     }
 
@@ -88,27 +86,13 @@ public class GitLogic(ILogger<GitLogic> logger)
 
     public string GetRepoLocalPath(GitSettings git, string repoUrl, string? sparsePath = null)
     {
-        return Path.Combine(git.LocalBaseDir, GetSafeRepoName(repoUrl, sparsePath));
+        return Path.Combine(git.LocalBaseDir, GetSafeRepoName(repoUrl));
     }
 
-    private string GetSafeRepoName(string repoUrl, string? sparsePath = null)
+    private string GetSafeRepoName(string repoUrl)
     {
         var uri = new Uri(repoUrl);
         var name = uri.AbsolutePath.Trim('/').Replace("/", "_").Replace(".git", "");
-        
-        if (!string.IsNullOrWhiteSpace(sparsePath))
-        {
-            var cleanPath = sparsePath.Replace("/", "_").Replace("\\", "_");
-            // If it's a file path, try to get just the folder part for cleaner naming
-            if (cleanPath.Contains(".csproj") || cleanPath.Contains("package.json"))
-            {
-                var dir = Path.GetDirectoryName(sparsePath.Replace("/", "\\"));
-                if (!string.IsNullOrEmpty(dir)) 
-                    cleanPath = dir.Replace("/", "_").Replace("\\", "_");
-            }
-            name += "_" + cleanPath;
-        }
-
         return string.IsNullOrWhiteSpace(name) ? "unknown_repo" : name;
     }
 
@@ -177,9 +161,9 @@ public class GitLogic(ILogger<GitLogic> logger)
         {
             var url = "https://api.github.com/user/repos?per_page=100&sort=updated";
             var response = await client.GetAsync(url);
-            
+
             var content = await response.Content.ReadAsStringAsync();
-            
+
             if (!response.IsSuccessStatusCode)
             {
                 logger.LogWarning("GitHub API error {Status}: {Content}", response.StatusCode, content);
@@ -229,7 +213,7 @@ public class GitLogic(ILogger<GitLogic> logger)
             UseShellExecute = false,
             CreateNoWindow = true
         };
-        
+
         // Prevent git from hanging on auth prompts
         psi.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
 

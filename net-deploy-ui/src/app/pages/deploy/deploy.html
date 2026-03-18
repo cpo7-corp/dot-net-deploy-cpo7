@@ -5,7 +5,7 @@
     <div class="d-flex align-items-center gap-2">
       <label class="text-secondary small mb-0">Environment:</label>
       <select class="form-select form-select-sm bg-dark text-white border-secondary w-auto"
-        [(ngModel)]="selectedEnvironmentId" [disabled]="deploying()">
+        [ngModel]="selectedEnvironmentId()" (ngModelChange)="selectedEnvironmentId.set($event); onEnvironmentChange($event)" [disabled]="deploying()">
         @for (env of environments(); track env.id) {
         <option [value]="env.id">{{ env.name }} ({{ env.host }})</option>
         }

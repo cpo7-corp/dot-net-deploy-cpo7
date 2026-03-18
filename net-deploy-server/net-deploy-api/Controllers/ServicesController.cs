@@ -33,6 +33,8 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
                 ProjectPath = s.ProjectPath,
                 Enabled = s.Enabled,
                 LastDeployed = s.LastDeployed,
+                CompileSingleFile = s.CompileSingleFile,
+                HeartbeatUrl = s.HeartbeatUrl,
                 Status = status
             };
         }));

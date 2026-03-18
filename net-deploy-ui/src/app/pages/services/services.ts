@@ -94,6 +94,6 @@ export class ServicesComponent implements OnInit {
   }
 
   private resetNewService(): Partial<ServiceDefinition> {
-    return { name: '', repoUrl: '', projectPath: '', iisSiteName: '', serviceType: 'WebApi', enabled: true, deployTargetPath: '', branch: '' };
+    return { name: '', repoUrl: '', projectPath: '', iisSiteName: '', serviceType: 'WebApi', enabled: true, deployTargetPath: '', branch: '', compileSingleFile: false, heartbeatUrl: '' };
   }
 }

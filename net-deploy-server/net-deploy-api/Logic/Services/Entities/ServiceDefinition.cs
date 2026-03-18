@@ -27,6 +27,7 @@ public class ServiceDefinition
     public string DeployTargetPath { get; set; } = string.Empty;
 
     public string Branch { get; set; } = "main";
-
+    public bool CompileSingleFile { get; set; } = false;
+    public string HeartbeatUrl { get; set; } = string.Empty;
     public DateTime? LastDeployed { get; set; }
 }

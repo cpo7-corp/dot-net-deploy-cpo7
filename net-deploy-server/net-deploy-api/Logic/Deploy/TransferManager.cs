@@ -12,7 +12,7 @@ public class TransferManager
         {
             try
             {
-                if (vps != null && !string.IsNullOrWhiteSpace(vps.Host) && vps.Host != "localhost" && vps.Host != "127.0.0.1")
+                if (vps != null && !vps.IsLocal && !string.IsNullOrWhiteSpace(vps.Host) && vps.Host != "localhost" && vps.Host != "127.0.0.1")
                 {
                     if (attempt > 1) await log("WARNING", $"🔄 Retrying upload ({attempt}/{maxTransferAttempts})...", serviceId);
                     else await log("INFO", $"🚀 Uploading files to remote VPS: {vps.Host} at {remotePath}...", serviceId);
@@ -22,7 +22,7 @@ public class TransferManager
                 }
                 else
                 {
-                    await log("INFO", $"📂 Copying to: {remotePath} (local)", serviceId);
+                    await log("INFO", $"📂 Copying files to Local server at {remotePath}...", serviceId);
                     FileHelper.CopyDirectory(localPath, remotePath);
                     await log("SUCCESS", $"✅ Files copied locally to {remotePath}", serviceId);
                 }

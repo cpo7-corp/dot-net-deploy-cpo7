@@ -135,6 +135,11 @@ public class DeployController(
     public async Task<ActionResult<List<string>>> GetRecentSessions([FromQuery] int count = 10) =>
         Ok(await deployLogsLogic.GetRecentSessionsAsync(count));
 
+    /// <summary>Returns paged session summaries for Deployment History.</summary>
+    [HttpGet("sessions-paged")]
+    public async Task<ActionResult<List<DeployLogsLogic.SessionSummary>>> GetSessionsPaged([FromQuery] int skip = 0, [FromQuery] int limit = 20) =>
+        Ok(await deployLogsLogic.GetSessionsPagedAsync(skip, limit));
+
     public record ServiceDeploymentConfig(string ServiceId, string? Branch);
     public record DeployRequest(List<ServiceDeploymentConfig> Services, string? EnvironmentId, bool ForceClean = false, bool CloneAllFirst = false, bool SkipBuildIfOutputExists = false);
 }

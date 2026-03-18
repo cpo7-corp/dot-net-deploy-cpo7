@@ -72,7 +72,17 @@ export class DeployService extends ApiService {
     return this.http!.get<string[]>(`${this.baseUrl}/Deploy/sessions?count=${count}`);
   }
 
+  getSessionsPaged(skip = 0, limit = 20): Observable<SessionSummary[]> {
+    return this.http!.get<SessionSummary[]>(`${this.baseUrl}/Deploy/sessions-paged?skip=${skip}&limit=${limit}`);
+  }
+
   getLogs(sessionId: string): Observable<DeployLogEntry[]> {
     return this.http!.get<DeployLogEntry[]>(`${this.baseUrl}/Deploy/logs/${sessionId}`);
   }
+}
+
+export interface SessionSummary {
+  sessionId: string;
+  timestamp: string;
+  hasErrors: boolean;
 }

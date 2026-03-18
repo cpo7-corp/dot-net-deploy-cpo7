@@ -47,7 +47,8 @@ export class SettingsComponent implements OnInit {
       host: '',
       username: '',
       password: '',
-      port: 22
+      port: 22,
+      isLocal: false
     };
     this.settings.update(s => ({
       ...s,

@@ -50,26 +50,41 @@
               <i class="bi bi-trash-fill fs-5"></i>
             </button>
             <div class="row g-3">
-              <div class="col-md-12">
+              <div class="col-md-8">
                 <label class="form-label">Environment Name</label>
                 <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.name" [name]="'v_name_' + $index" placeholder="e.g. Production" required>
               </div>
-              <div class="col-md-9">
-                <label class="form-label">{{ 'SETTINGS.HOST' | translate }}</label>
-                <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.host" [name]="'v_host_' + $index" placeholder="1.2.3.4" required>
+              <div class="col-md-4 d-flex align-items-end">
+                <div class="form-check form-switch mb-2">
+                  <input class="form-check-input" type="checkbox" role="switch" [id]="'isLocal_' + $index" [(ngModel)]="vps.isLocal" [name]="'v_isLocal_' + $index">
+                  <label class="form-check-label text-info" [for]="'isLocal_' + $index">Local Server (Skip SFTP)</label>
+                </div>
               </div>
-              <div class="col-md-3">
-                <label class="form-label">{{ 'SETTINGS.PORT' | translate }}</label>
-                <input type="number" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.port" [name]="'v_port_' + $index" required>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">{{ 'SETTINGS.USERNAME' | translate }}</label>
-                <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.username" [name]="'v_username_' + $index" required>
-              </div>
-              <div class="col-md-6">
-                <label class="form-label">{{ 'SETTINGS.PASSWORD' | translate }}</label>
-                <input type="password" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.password" [name]="'v_password_' + $index">
-              </div>
+
+              @if (!vps.isLocal) {
+                <div class="col-md-9">
+                  <label class="form-label">{{ 'SETTINGS.HOST' | translate }}</label>
+                  <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.host" [name]="'v_host_' + $index" placeholder="1.2.3.4" required>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">{{ 'SETTINGS.PORT' | translate }}</label>
+                  <input type="number" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.port" [name]="'v_port_' + $index" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ 'SETTINGS.USERNAME' | translate }}</label>
+                  <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.username" [name]="'v_username_' + $index" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">{{ 'SETTINGS.PASSWORD' | translate }}</label>
+                  <input type="password" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.password" [name]="'v_password_' + $index">
+                </div>
+              } @else {
+                <div class="col-12">
+                  <div class="p-2 border border-info border-opacity-25 rounded bg-info bg-opacity-10 text-info">
+                    <i class="bi bi-info-circle me-2"></i> Deployment will copy files directly to the target path without SFTP.
+                  </div>
+                </div>
+              }
             </div>
           </div>
         }

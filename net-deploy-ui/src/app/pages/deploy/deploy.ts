@@ -49,10 +49,21 @@ export class DeployComponent implements OnInit {
 
     this.settingsSvc.getSettings().subscribe(data => {
       this.environments.set(data.vpsEnvironments || []);
-      if (data.vpsEnvironments?.length > 0) {
+      const savedEnvId = localStorage.getItem('lastEnvironmentId');
+      const environmentExists = data.vpsEnvironments?.some(e => e.id === savedEnvId);
+
+      if (savedEnvId && environmentExists) {
+        this.selectedEnvironmentId.set(savedEnvId);
+      } else if (data.vpsEnvironments?.length > 0) {
         this.selectedEnvironmentId.set(data.vpsEnvironments[0].id || null);
       }
     });
+  }
+
+  onEnvironmentChange(id: string | null) {
+    if (id) {
+      localStorage.setItem('lastEnvironmentId', id);
+    }
   }
 
   setServiceBranch(id: string, branch: string) {
