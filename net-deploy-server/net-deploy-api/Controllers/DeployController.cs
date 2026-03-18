@@ -3,6 +3,7 @@ using NET.Deploy.Api.Logic.Deploy;
 using NET.Deploy.Api.Logic.DeployLogs;
 using NET.Deploy.Api.Logic.DeployLogs.Entities;
 using NET.Deploy.Api.Logic.Services;
+using NET.Deploy.Api.Logic.Services.Entities;
 using NET.Deploy.Api.Logic.Settings;
 using NET.Deploy.Api.Logic.Settings.Entities;
 
@@ -67,6 +68,22 @@ public class DeployController(
                           ?? settings.VpsEnvironments.FirstOrDefault()
                           ?? new VpsSettings();
 
+        // A session-level dictionary to store repository preparation tasks.
+        // This ensures that for every (RepoUrl, Branch) combination, we ONLY pull once per request,
+        // even if multiple services share the same repo and are processed in parallel.
+        var repoPrepTasks = new System.Collections.Concurrent.ConcurrentDictionary<string, Task<bool>>();
+
+        // Helper to get or start a prep task for a specific service's repository
+        Task<bool> EnsureRepoUpdated(ServiceDefinition srv, string? branchOverride)
+        {
+            var branchKey = branchOverride ?? srv.Branch;
+            var repoKey = $"{srv.RepoUrl}|{branchKey}";
+
+            return repoPrepTasks.GetOrAdd(repoKey, _ => 
+                deployLogic.PrepGitOnlyAsync(srv, settings, Log, branchOverride, request.ForceClean)
+            );
+        }
+
         // PHASE 1: Optional Prep (Clone all first)
         if (request.CloneAllFirst)
         {
@@ -76,7 +93,8 @@ public class DeployController(
                 var srv = await servicesLogic.GetByIdAsync(config.ServiceId);
                 if (srv != null)
                 {
-                    await deployLogic.PrepGitOnlyAsync(srv, settings, Log, config.Branch, request.ForceClean);
+                    // Trigger the pull task and wait for it. Parallel calls helper will return the same task.
+                    await EnsureRepoUpdated(srv, config.Branch);
                 }
             }
             await Log("INFO", "✅ [PHASE 1] Pre-clone complete. Starting builds/deploys...");
@@ -92,7 +110,18 @@ public class DeployController(
                 return (Name: $"Unknown ({serviceId})", Success: false);
             }
 
-            var success = await deployLogic.DeployServiceAsync(service, settings, Log, config.Branch, vpsSettings, request.ForceClean, request.CloneAllFirst, request.SkipBuildIfOutputExists);
+            // Always ensure the repo is updated. 
+            // If PHASE 1 already ran, EnsureRepoUpdated will return the already-completed task.
+            // If not, it will start one (and only one) and we'll await it here.
+            var pullSuccess = await EnsureRepoUpdated(service, config.Branch);
+            if (!pullSuccess)
+            {
+                await Log("ERROR", "❌ Git pull failed – skipping remaining steps.");
+                return (Name: service.Name, Success: false);
+            }
+
+            // Since we just ensured it's pulled, we tell DeployServiceAsync to skip its internal pull logic.
+            var success = await deployLogic.DeployServiceAsync(service, settings, Log, config.Branch, vpsSettings, request.ForceClean, skipPull: true, request.SkipBuildIfOutputExists);
 
             if (success)
                 await servicesLogic.MarkDeployedAsync(serviceId);

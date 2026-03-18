@@ -61,7 +61,7 @@ public class DeployLogic(
     {
         var (repoUrl, branch, projectPath) = gitLogic.ParseGitUrl(service.RepoUrl);
         var effectiveBranch = GetEffectiveBranch(service, branch, branchOverride);
-        var effectiveProjectPath = GetEffectiveProjectPath(service, projectPath);
+        var effectiveProjectPath = NormalizePath(GetEffectiveProjectPath(service, projectPath));
 
         await log("INFO", $"📥 [Prep] Pulling Git for {service.Name} ({effectiveBranch})...", service.Id);
         return await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean);
@@ -89,7 +89,7 @@ public class DeployLogic(
 
         var (repoUrl, branch, projectPath) = gitLogic.ParseGitUrl(service.RepoUrl);
         var effectiveBranch = GetEffectiveBranch(service, branch, branchOverride);
-        var effectiveProjectPath = GetEffectiveProjectPath(service, projectPath);
+        var effectiveProjectPath = NormalizePath(GetEffectiveProjectPath(service, projectPath));
 
         await log("INFO", $"▶ Starting deploy for: {service.Name}", serviceId);
 
@@ -165,6 +165,7 @@ public class DeployLogic(
         }
         catch (Exception ex)
         {
+            await log("WARNING", $"🔄 Transfer failed. Attempting to restart service/site to restore availability...", service.Id);
             if (isWindowsService) 
                 await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id);
             else if (service.ServiceType is "WebApi" or "Mvc")
@@ -201,12 +202,16 @@ public class DeployLogic(
     private async Task ManageIisSiteAsync(string? iisSiteName, string action, LogCallback log, string? serviceId)
     {
         var actionIcon = action == "start" ? "🏁 Starting" : "🛑 Stopping";
-        await log("INFO", $"{actionIcon} IIS Site: {iisSiteName}...", serviceId);
+        await log("INFO", $"{actionIcon} IIS Site & AppPool: {iisSiteName}...", serviceId);
         var appcmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"inetsrv\appcmd.exe");
         if (!File.Exists(appcmd)) appcmd = "appcmd.exe"; // Fallback to path
 
+        // Stop/Start BOTH the Site and the App Pool. 
+        // Stopping the App Pool is crucial as it's the w3wp.exe process that locks files.
         await processRunner.RunAsync(appcmd, $"{action} site \"{iisSiteName}\"", ".", log, serviceId);
-        if (action == "stop") await Task.Delay(2000);
+        await processRunner.RunAsync(appcmd, $"{action} apppool \"{iisSiteName}\"", ".", log, serviceId);
+        
+        if (action == "stop") await Task.Delay(3000);
     }
 
     private async Task CheckHeartbeatAsync(string url, LogCallback log, string? serviceId)
@@ -241,5 +246,11 @@ public class DeployLogic(
     private static string GetEffectiveProjectPath(ServiceDefinition service, string parsedPath)
     {
         return string.IsNullOrWhiteSpace(service.ProjectPath) ? parsedPath : service.ProjectPath;
+    }
+
+    private static string NormalizePath(string path)
+    {
+        if (string.IsNullOrEmpty(path)) return path;
+        return path.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
     }
 }

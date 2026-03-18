@@ -26,7 +26,21 @@ public class ProcessRunner
         var stderr = await errorTask;
 
         foreach (var line in stdout.Split('\n', StringSplitOptions.RemoveEmptyEntries))
-            await log("INFO", line.TrimEnd(), serviceId);
+        {
+            var trimmed = line.TrimEnd();
+            if (string.IsNullOrWhiteSpace(trimmed)) continue;
+            
+            // Filter noise: warnings and technical build/restore logs that clutter the UI
+            if (trimmed.Contains(": warning ")) continue;
+            if (trimmed.StartsWith("Restored ") && trimmed.Contains(".csproj")) continue;
+            if (trimmed.Contains(" -> ") && (trimmed.Contains(@"\bin\") || trimmed.Contains(@"/bin/"))) continue;
+            if (trimmed == "[]") continue;
+            if (trimmed.Contains("DetermineProjectsToRestore")) continue;
+            if (trimmed.Contains("Restore complete")) continue;
+            if (trimmed.Contains("Determining projects to restore...")) continue;
+
+            await log("INFO", trimmed, serviceId);
+        }
 
         if (process.ExitCode != 0)
         {
