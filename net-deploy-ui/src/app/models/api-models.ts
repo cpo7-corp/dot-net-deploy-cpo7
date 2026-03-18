@@ -63,6 +63,8 @@ export interface FileRename {
 
 export interface ServiceStatus extends ServiceDefinition {
   status: 'Running' | 'Stopped' | 'Error' | 'Unknown';
+  isChecking?: boolean;
+  hbStatus?: 'Running' | 'Stopped' | 'Unknown' | 'Checking';
 }
 
 export interface DeployLogEntry {

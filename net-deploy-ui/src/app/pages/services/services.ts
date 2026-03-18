@@ -1,6 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { TranslateModule } from '@ngx-translate/core';
 import { ServicesMonitorService } from '../../services/services-monitor.service';
 import { SettingsService } from '../../services/settings.service';
@@ -20,6 +21,7 @@ export class ServicesComponent implements OnInit {
   private settingsSvc = inject(SettingsService);
   private configSvc = inject(EnvConfigsService);
   private deploySvc = inject(DeployService);
+  private http = inject(HttpClient);
 
   services = signal<ServiceStatus[]>([]);
   loading = signal<boolean>(true);
@@ -55,8 +57,36 @@ export class ServicesComponent implements OnInit {
       next: (data) => {
         this.services.set(data);
         this.loading.set(false);
+        this.checkHeartbeats();
       },
       error: () => this.loading.set(false)
+    });
+  }
+
+  checkHeartbeats() {
+    this.services().forEach(s => {
+      // For SPA services (Angular, React), we also check Heartbeat in the UI
+      if (s.serviceType === 'Angular' || s.serviceType === 'React') {
+        const env = s.environments?.find(e => e.environmentId === this.targetEnvId);
+        if (env?.heartbeatUrl) {
+          s.isChecking = true;
+          s.hbStatus = 'Checking';
+          this.services.update(list => [...list]);
+
+          this.http.get(env.heartbeatUrl, { responseType: 'text' }).subscribe({
+            next: () => { 
+               s.hbStatus = 'Running'; 
+               s.isChecking = false; 
+               this.services.update(list => [...list]);
+            },
+            error: () => { 
+               s.hbStatus = 'Stopped'; 
+               s.isChecking = false; 
+               this.services.update(list => [...list]);
+            }
+          });
+        }
+      }
     });
   }
 
@@ -83,6 +113,7 @@ export class ServicesComponent implements OnInit {
   onTargetEnvChange(id: string | null) {
     if (id) {
       localStorage.setItem('lastTargetEnvId', id);
+      this.loadData();
     }
   }
 

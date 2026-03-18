@@ -29,7 +29,13 @@
             <tr>
               <td class="ps-4 fw-bold text-info">{{cfg.name}}</td>
               <td><span class="text-white-50 small">{{cfg.sourceFileName || ('notAvailableShort' | translate)}}</span></td>
-              <td><code class="text-white-50" *ngIf="cfg.targetFileName">{{cfg.targetFileName}}</code><span class="text-secondary small" *ngIf="!cfg.targetFileName">{{ 'noneShort' | translate }}</span></td>
+              <td>
+                @if (cfg.targetFileName) {
+                  <code class="text-white-50">{{cfg.targetFileName}}</code>
+                } @else {
+                  <span class="text-secondary small">{{ 'noneShort' | translate }}</span>
+                }
+              </td>
               <td><span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25">{{cfg.variables.length}} {{ 'overrides' | translate }}</span></td>
               <td class="text-end pe-4">
                 <div class="btn-group">
@@ -45,69 +51,71 @@
   </div>
 
   <!-- Modal -->
-  <div class="modal d-block" *ngIf="isModalOpen" tabindex="-1">
-    <div class="modal-backdrop fade show" style="position: fixed; inset: 0;" (click)="closeModal()"></div>
-    <div class="modal-dialog modal-lg modal-dialog-centered" style="position: relative; z-index: 1060;">
-      <div class="modal-content bg-dark text-white border-secondary glass-panel shadow-lg">
-        <div class="modal-header border-secondary">
-          <h5 class="modal-title"><i class="bi bi-braces-asterisk me-2 text-warning"></i>{{ (selectedConfig ? 'edit' : 'create') | translate }} {{ 'variables' | translate }}</h5>
-          <button type="button" class="btn-close btn-close-white" (click)="closeModal()"></button>
-        </div>
-        <div class="modal-body">
-          <div class="row g-3">
-            <div class="col-12">
-              <label class="form-label text-secondary small">{{ 'descriptiveName' | translate }}</label>
-              <input type="text" class="form-control bg-dark text-white border-secondary" 
-                     [(ngModel)]="(selectedConfig || newConfig).name" [placeholder]="'descriptiveName' | translate">
-            </div>
-
-            <div class="col-md-6">
-              <label class="form-label text-secondary small">{{ 'sourceFileName' | translate }}</label>
-              <input type="text" class="form-control bg-dark text-white border-secondary" 
-                     [(ngModel)]="(selectedConfig || newConfig).sourceFileName" [placeholder]="'sourceFileName' | translate">
-            </div>
-
-            <div class="col-md-6">
-              <label class="form-label text-secondary small">{{ 'targetFileToRename' | translate }}</label>
-              <input type="text" class="form-control bg-dark text-white border-secondary" 
-                     [(ngModel)]="(selectedConfig || newConfig).targetFileName" [placeholder]="'targetFileToRename' | translate">
-            </div>
-
-            <div class="col-12 mt-4">
-              <div class="d-flex justify-content-between align-items-center mb-2">
-                <h6 class="text-info mb-0">{{ 'variables' | translate }}</h6>
-                <button type="button" class="btn btn-sm btn-outline-info" (click)="addVariable()">
-                  <i class="bi bi-plus-lg"></i> {{ 'addVariable' | translate }}
-                </button>
+  @if (isModalOpen) {
+    <div class="modal d-block" tabindex="-1">
+      <div class="modal-backdrop fade show" style="position: fixed; inset: 0;" (click)="closeModal()"></div>
+      <div class="modal-dialog modal-lg modal-dialog-centered" style="position: relative; z-index: 1060;">
+        <div class="modal-content bg-dark text-white border-secondary glass-panel shadow-lg">
+          <div class="modal-header border-secondary">
+            <h5 class="modal-title"><i class="bi bi-braces-asterisk me-2 text-warning"></i>{{ (selectedConfig ? 'edit' : 'create') | translate }} {{ 'variables' | translate }}</h5>
+            <button type="button" class="btn-close btn-close-white" (click)="closeModal()"></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label text-secondary small">{{ 'descriptiveName' | translate }}</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" 
+                       [(ngModel)]="(selectedConfig || newConfig).name" [placeholder]="'descriptiveName' | translate">
               </div>
-              <div class="border border-secondary border-opacity-25 rounded p-3 bg-black bg-opacity-25">
-                 @for (v of (selectedConfig || newConfig).variables; track $index) {
-                   <div class="row g-2 mb-2">
-                     <div class="col-md-5">
-                       <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary font-monospace" [(ngModel)]="v.key" [placeholder]="'descriptionKeyPlaceholder' | translate">
+
+              <div class="col-md-6">
+                <label class="form-label text-secondary small">{{ 'sourceFileName' | translate }}</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" 
+                       [(ngModel)]="(selectedConfig || newConfig).sourceFileName" [placeholder]="'sourceFileName' | translate">
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label text-secondary small">{{ 'targetFileToRename' | translate }}</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" 
+                       [(ngModel)]="(selectedConfig || newConfig).targetFileName" [placeholder]="'targetFileToRename' | translate">
+              </div>
+
+              <div class="col-12 mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h6 class="text-info mb-0">{{ 'variables' | translate }}</h6>
+                  <button type="button" class="btn btn-sm btn-outline-info" (click)="addVariable()">
+                    <i class="bi bi-plus-lg"></i> {{ 'addVariable' | translate }}
+                  </button>
+                </div>
+                <div class="border border-secondary border-opacity-25 rounded p-3 bg-black bg-opacity-25">
+                   @for (v of (selectedConfig || newConfig).variables; track $index) {
+                     <div class="row g-2 mb-2">
+                       <div class="col-md-5">
+                         <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary font-monospace" [(ngModel)]="v.key" [placeholder]="'descriptionKeyPlaceholder' | translate">
+                       </div>
+                       <div class="col-md-6">
+                         <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="v.value" [placeholder]="'value' | translate">
+                       </div>
+                       <div class="col-md-1 text-end">
+                         <button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="removeVariable($index)"><i class="bi bi-x-circle-fill"></i></button>
+                       </div>
                      </div>
-                     <div class="col-md-6">
-                       <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="v.value" [placeholder]="'value' | translate">
-                     </div>
-                     <div class="col-md-1 text-end">
-                       <button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="removeVariable($index)"><i class="bi bi-x-circle-fill"></i></button>
-                     </div>
-                   </div>
-                 }
-                 @if (!(selectedConfig || newConfig).variables?.length) {
-                   <div class="text-secondary small fst-italic">{{ 'noVariablesDefined' | translate }}</div>
-                 }
+                   }
+                   @if (!(selectedConfig || newConfig).variables?.length) {
+                     <div class="text-secondary small fst-italic">{{ 'noVariablesDefined' | translate }}</div>
+                   }
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div class="modal-footer border-secondary">
-          <button type="button" class="btn btn-outline-secondary px-4" (click)="closeModal()">{{ 'cancel' | translate }}</button>
-          <button type="button" class="btn btn-primary px-5 shadow-sm" (click)="saveConfig()" [disabled]="!(selectedConfig || newConfig).name">
-            {{ 'saveVariables' | translate }}
-          </button>
+          <div class="modal-footer border-secondary">
+            <button type="button" class="btn btn-outline-secondary px-4" (click)="closeModal()">{{ 'cancel' | translate }}</button>
+            <button type="button" class="btn btn-primary px-5 shadow-sm" (click)="saveConfig()" [disabled]="!(selectedConfig || newConfig).name">
+              {{ 'saveVariables' | translate }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  }
 </div>

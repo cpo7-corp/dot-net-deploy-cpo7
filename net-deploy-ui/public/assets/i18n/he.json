@@ -107,6 +107,7 @@
   "targetEnv": "סביבת יעד:",
   "never": "מעולם לא",
   "processing": "בתהליך...",
+  "checking": "בודק...",
   "start": "הפעלה",
   "restartRecycle": "אתחול / מיחזור",
   "aspNetWebMvc": "ASP.NET WebAPI / MVC",

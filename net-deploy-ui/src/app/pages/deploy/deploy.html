@@ -35,41 +35,41 @@
           }
 
           @if (!loading()) {
-          @if (services().length === 0) {
-          <div class="p-4 text-center text-secondary">
-            {{ 'noServices' | translate }}
-          </div>
-          }
-
-          <div class="list-group list-group-flush border-0">
-            @for (s of services(); track s.id) {
-            <div class="list-group-item bg-transparent text-white border-bottom border-secondary p-0"
-              [class.bg-primary]="selectedServiceIds.has(s.id!)" [class.bg-opacity-10]="selectedServiceIds.has(s.id!)">
-              <div class="d-flex align-items-center gap-3 py-2 px-3">
-                <input class="form-check-input mt-0 fs-5" type="checkbox" [checked]="selectedServiceIds.has(s.id!)"
-                  (change)="toggleService(s.id!)" [disabled]="deploying()">
-                <div class="flex-grow-1" (click)="toggleService(s.id!)" style="cursor: pointer">
-                  <div class="fw-bold mb-0 small">{{ s.name }}</div>
-                </div>
-                <span class="badge"
-                  [ngClass]="s.status === 'Running' ? 'bg-success' : (s.status === 'Stopped' ? 'bg-danger' : 'bg-secondary')">
-                  {{ (s.status ? (s.status | lowercase) : 'unknown') | translate }}
-                </span>
+            @if (services().length === 0) {
+              <div class="p-4 text-center text-secondary">
+                {{ 'noServices' | translate }}
               </div>
+            }
 
-              @if (selectedServiceIds.has(s.id!)) {
-              <div class="px-3 pb-3 pt-0 ms-5 me-3">
-                <div class="input-group input-group-sm">
-                  <span class="input-group-text bg-dark border-secondary text-secondary"
-                    style="font-size: 0.7rem;">{{ 'branch' | translate }}</span>
-                  <input type="text" class="form-control bg-dark text-white border-secondary"
-                    [(ngModel)]="serviceBranches[s.id!]" [disabled]="deploying()">
+            <div class="list-group list-group-flush border-0">
+              @for (s of services(); track s.id) {
+                <div class="list-group-item bg-transparent text-white border-bottom border-secondary p-0"
+                  [class.bg-primary]="selectedServiceIds.has(s.id!)" [class.bg-opacity-10]="selectedServiceIds.has(s.id!)">
+                  <div class="d-flex align-items-center gap-3 py-2 px-3">
+                    <input class="form-check-input mt-0 fs-5" type="checkbox" [checked]="selectedServiceIds.has(s.id!)"
+                      (change)="toggleService(s.id!)" [disabled]="deploying()">
+                    <div class="flex-grow-1" (click)="toggleService(s.id!)" style="cursor: pointer">
+                      <div class="fw-bold mb-0 small">{{ s.name }}</div>
+                    </div>
+                    <span class="badge"
+                      [ngClass]="s.status === 'Running' ? 'bg-success' : (s.status === 'Stopped' ? 'bg-danger' : 'bg-secondary')">
+                      {{ (s.status ? (s.status | lowercase) : 'unknown') | translate }}
+                    </span>
+                  </div>
+
+                  @if (selectedServiceIds.has(s.id!)) {
+                    <div class="px-3 pb-3 pt-0 ms-5 me-3">
+                      <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-dark border-secondary text-secondary"
+                          style="font-size: 0.7rem;">{{ 'branch' | translate }}</span>
+                        <input type="text" class="form-control bg-dark text-white border-secondary"
+                          [(ngModel)]="serviceBranches[s.id!]" [disabled]="deploying()">
+                      </div>
+                    </div>
+                  }
                 </div>
-              </div>
               }
             </div>
-            }
-          </div>
           }
         </div>
         <div class="card-footer border-top border-secondary p-3">
@@ -117,22 +117,22 @@
           </button>
 
           @if (deploying()) {
-          <div class="d-flex gap-2 mt-2">
-            <button class="btn btn-warning flex-grow-1 py-2 fw-bold text-dark" (click)="togglePause()">
-              <i class="bi" [class.bi-pause-fill]="!isPaused()" [class.bi-play-fill]="isPaused()"></i>
-              {{ (isPaused() ? 'resume' : 'pause') | translate }}
-            </button>
-            <button class="btn btn-danger flex-grow-1 py-2 fw-bold" (click)="stopDeployment()">
-              <i class="bi bi-stop-fill"></i> {{ 'stop' | translate }}
-            </button>
-          </div>
+            <div class="d-flex gap-2 mt-2">
+              <button class="btn btn-warning flex-grow-1 py-2 fw-bold text-dark" (click)="togglePause()">
+                <i class="bi" [class.bi-pause-fill]="!isPaused()" [class.bi-play-fill]="isPaused()"></i>
+                {{ (isPaused() ? 'resume' : 'pause') | translate }}
+              </button>
+              <button class="btn btn-danger flex-grow-1 py-2 fw-bold" (click)="stopDeployment()">
+                <i class="bi bi-stop-fill"></i> {{ 'stop' | translate }}
+              </button>
+            </div>
           }
 
           @if (failedServiceIds().length > 0 && !deploying()) {
-          <button class="btn btn-outline-danger w-100 mt-2 py-2 fw-bold" (click)="retryFailed()">
-            <i class="bi bi-arrow-clockwise me-2"></i>
-            {{ 'retryFailed' | translate }} ({{failedServiceIds().length}})
-          </button>
+            <button class="btn btn-outline-danger w-100 mt-2 py-2 fw-bold" (click)="retryFailed()">
+              <i class="bi bi-arrow-clockwise me-2"></i>
+              {{ 'retryFailed' | translate }} ({{failedServiceIds().length}})
+            </button>
           }
         </div>
       </div>
@@ -151,12 +151,12 @@
             <i class="bi bi-terminal me-1"></i>
             {{ 'liveTerminalTitle' | translate }}
             @if (deploying()) {
-            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 ms-2"
-              style="font-size: 0.7rem;">
-              <span class="spinner-border spinner-border-sm me-1" style="width: 10px; height: 10px;"
-                role="status"></span>
-              {{ elapsedTime() }}
-            </span>
+              <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 ms-2"
+                style="font-size: 0.7rem;">
+                <span class="spinner-border spinner-border-sm me-1" style="width: 10px; height: 10px;"
+                  role="status"></span>
+                {{ elapsedTime() }}
+              </span>
             }
           </div>
           <div style="width:44px"></div><!-- Spacer for center alignment -->
@@ -164,70 +164,70 @@
 
         <div class="card-body terminal-body" id="logContainer" style="height: 600px; overflow-y: auto; direction: ltr; text-align: left;">
           @if (logs().length === 0) {
-          <div class="h-100 d-flex align-items-center justify-content-center text-secondary fst-italic">
-            {{ 'logPlaceholder' | translate }}
-          </div>
+            <div class="h-100 d-flex align-items-center justify-content-center text-secondary fst-italic">
+              {{ 'logPlaceholder' | translate }}
+            </div>
           }
 
           @for (log of logs(); track $index) {
-          <div class="d-flex gap-3 text-break mb-1" [ngClass]="getLogClass(log.level)">
-            <span class="text-secondary flex-shrink-0">[{{ log.timestamp | date:'HH:mm:ss' }}]</span>
-            <div class="d-flex align-items-start gap-2">
-              @if (deploying() && $last && log.level !== 'DONE' && log.level !== 'SUCCESS' && log.level !== 'ERROR') {
-              <div class="spinner-border spinner-border-sm text-primary mt-1" style="width: 12px; height: 12px;"
-                role="status"></div>
-              }
-              <span [class.fw-bold]="log.level === 'ERROR'">{{ log.message }}</span>
+            <div class="d-flex gap-3 text-break mb-1" [ngClass]="getLogClass(log.level)">
+              <span class="text-secondary flex-shrink-0">[{{ log.timestamp | date:'HH:mm:ss' }}]</span>
+              <div class="d-flex align-items-start gap-2">
+                @if (deploying() && $last && log.level !== 'DONE' && log.level !== 'SUCCESS' && log.level !== 'ERROR') {
+                  <div class="spinner-border spinner-border-sm text-primary mt-1" style="width: 12px; height: 12px;"
+                    role="status"></div>
+                }
+                <span [class.fw-bold]="log.level === 'ERROR'">{{ log.message }}</span>
+              </div>
             </div>
-          </div>
           }
         </div>
       </div>
 
       <!-- Live Deployment Status Summary Table -->
-      <div class="card bg-black text-white border-secondary h-100 font-monospace shadow-lg mt-3"
-        *ngIf="objectKeys(deploymentProgress()).length > 0">
-        <div class="card-header bg-dark border-bottom border-secondary d-flex align-items-center py-2">
-          <h6 class="mb-0 small fw-bold text-secondary">{{ 'liveDeploymentStatus' | translate }}</h6>
+      @if (objectKeys(deploymentProgress()).length > 0) {
+        <div class="card bg-black text-white border-secondary h-100 font-monospace shadow-lg mt-3">
+          <div class="card-header bg-dark border-bottom border-secondary d-flex align-items-center py-2">
+            <h6 class="mb-0 small fw-bold text-secondary">{{ 'liveDeploymentStatus' | translate }}</h6>
+          </div>
+          <div class="card-body p-0">
+            <table class="table table-dark table-sm mb-0 align-middle small table-hover">
+              <thead class="text-secondary opacity-50">
+                <tr>
+                  <th class="ps-3 py-2">{{ 'serviceName' | translate }}</th>
+                  <th class="text-center">{{ 'build' | translate }}</th>
+                  <th class="text-center">{{ 'deployed' | translate }}</th>
+                  <th class="text-center">{{ 'heartbeat' | translate }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (id of objectKeys(deploymentProgress()); track id) {
+                  <tr class="border-secondary">
+                    <td class="ps-3 py-2 fw-bold text-info">{{ getServiceName(id) }}</td>
+                    <td class="text-center">
+                      <div class="d-flex align-items-center justify-content-center gap-2">
+                        <ng-container [ngTemplateOutlet]="statusIcon"
+                          [ngTemplateOutletContext]="{ status: deploymentProgress()[id].compiled }"></ng-container>
+                        @if (deploymentProgress()[id].buildTime) {
+                          <span class="text-secondary smaller opacity-75">({{ deploymentProgress()[id].buildTime }})</span>
+                        }
+                      </div>
+                    </td>
+                    <td class="text-center">
+                      <ng-container [ngTemplateOutlet]="statusIcon"
+                        [ngTemplateOutletContext]="{ status: deploymentProgress()[id].deployed }"></ng-container>
+                    </td>
+                    <td class="text-center">
+                      <ng-container [ngTemplateOutlet]="statusIcon"
+                        [ngTemplateOutletContext]="{ status: deploymentProgress()[id].heartbeat }"></ng-container>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div class="card-body p-0">
-          <table class="table table-dark table-sm mb-0 align-middle small table-hover">
-            <thead class="text-secondary opacity-50">
-              <tr>
-                <th class="ps-3 py-2">{{ 'serviceName' | translate }}</th>
-                <th class="text-center">{{ 'build' | translate }}</th>
-                <th class="text-center">{{ 'deployed' | translate }}</th>
-                <th class="text-center">{{ 'heartbeat' | translate }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (id of objectKeys(deploymentProgress()); track id) {
-              <tr class="border-secondary">
-                <td class="ps-3 py-2 fw-bold text-info">{{ getServiceName(id) }}</td>
-                <td class="text-center">
-                  <div class="d-flex align-items-center justify-content-center gap-2">
-                    <ng-container [ngTemplateOutlet]="statusIcon"
-                      [ngTemplateOutletContext]="{ status: deploymentProgress()[id].compiled }"></ng-container>
-                    <span class="text-secondary smaller opacity-75" *ngIf="deploymentProgress()[id].buildTime">({{
-                      deploymentProgress()[id].buildTime }})</span>
-                  </div>
-                </td>
-                <td class="text-center">
-                  <ng-container [ngTemplateOutlet]="statusIcon"
-                    [ngTemplateOutletContext]="{ status: deploymentProgress()[id].deployed }"></ng-container>
-                </td>
-                <td class="text-center">
-                  <ng-container [ngTemplateOutlet]="statusIcon"
-                    [ngTemplateOutletContext]="{ status: deploymentProgress()[id].heartbeat }"></ng-container>
-                </td>
-              </tr>
-              }
-            </tbody>
-
-
-          </table>
-        </div>
-      </div>
+      }
     </div>
   </div>
 </div>

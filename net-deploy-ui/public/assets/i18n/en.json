@@ -107,6 +107,7 @@
   "targetEnv": "Target Env:",
   "never": "Never",
   "processing": "Processing...",
+  "checking": "Checking...",
   "start": "Start",
   "restartRecycle": "Restart / Recycle",
   "aspNetWebMvc": "ASP.NET WebAPI / MVC",
