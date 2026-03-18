@@ -136,7 +136,7 @@ public class DeployLogic(
         if (!buildSuccess)
         {
             if (isWindowsService) 
-                await ManageWindowsServiceAsync(service.IisSiteName, "start", log, serviceId);
+                await ManageWindowsServiceAsync(service.IisSiteName, "start", log, serviceId, service.DeployTargetPath);
             else if (service.ServiceType is "WebApi" or "Mvc")
                 await ManageIisSiteAsync(service.IisSiteName, "start", log, serviceId);
             
@@ -167,7 +167,7 @@ public class DeployLogic(
         {
             await log("WARNING", $"🔄 Transfer failed. Attempting to restart service/site to restore availability...", service.Id);
             if (isWindowsService) 
-                await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id);
+                await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id, service.DeployTargetPath);
             else if (service.ServiceType is "WebApi" or "Mvc")
                 await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id);
             
@@ -177,7 +177,7 @@ public class DeployLogic(
         }
 
         if (isWindowsService)
-            await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id);
+            await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id, service.DeployTargetPath);
         else if (service.ServiceType is "WebApi" or "Mvc")
             await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id);
 
@@ -191,11 +191,43 @@ public class DeployLogic(
         return true;
     }
 
-    private async Task ManageWindowsServiceAsync(string? iisSiteName, string action, LogCallback log, string? serviceId) /* action => start / stop */
+    private async Task ManageWindowsServiceAsync(string? iisSiteName, string action, LogCallback log, string? serviceId, string? targetPath = null) /* action => start / stop */
     {
         var actionIcon = action == "start" ? "🏁 Starting" : "🛑 Stopping";
         await log("INFO", $"{actionIcon} Windows Service: {iisSiteName}...", serviceId);
-        await processRunner.RunAsync("sc.exe", $"{action} {iisSiteName}", ".", log, serviceId);
+
+        // Try the action
+        var success = await processRunner.RunAsync("sc.exe", $"{action} {iisSiteName}", ".", log, serviceId);
+        
+        if (action == "start" && !success && !string.IsNullOrWhiteSpace(targetPath))
+        {
+            // If failed to start, check if it's because it doesn't exist
+            await log("INFO", $"🔍 Service '{iisSiteName}' might be missing. Checking...", serviceId);
+            
+            // Search for primary EXE
+            if (Directory.Exists(targetPath))
+            {
+                var files = Directory.GetFiles(targetPath, "*.exe");
+                var exePath = files.FirstOrDefault(f => !f.EndsWith("apphost.exe", StringComparison.OrdinalIgnoreCase));
+                
+                if (exePath != null)
+                {
+                    await log("INFO", $"🏗️ Creating Windows Service '{iisSiteName}' (Auto-start)...", serviceId);
+                    // CRITICAL: sc.exe requires a space AFTER the equals sign (e.g. binPath= "...")!
+                    var created = await processRunner.RunAsync("sc.exe", "create \"" + iisSiteName + "\" binPath= \"" + exePath + "\" start= auto", ".", log, serviceId);
+                    if (created)
+                    {
+                        await log("SUCCESS", $"✅ Service '{iisSiteName}' created. Starting now...", serviceId);
+                        await processRunner.RunAsync("sc.exe", $"start {iisSiteName}", ".", log, serviceId);
+                    }
+                }
+                else
+                {
+                    await log("WARNING", "⚠️ Could not find executable to create windows service.", serviceId);
+                }
+            }
+        }
+
         if (action == "stop") await Task.Delay(2000); 
     }
 
