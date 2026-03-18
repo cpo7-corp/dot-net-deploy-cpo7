@@ -73,18 +73,19 @@ export class ServicesComponent implements OnInit {
           s.hbStatus = 'Checking';
           this.services.update(list => [...list]);
 
-          this.http.get(env.heartbeatUrl, { responseType: 'text' }).subscribe({
-            next: () => { 
-               s.hbStatus = 'Running'; 
-               s.isChecking = false; 
-               this.services.update(list => [...list]);
-            },
-            error: () => { 
-               s.hbStatus = 'Stopped'; 
-               s.isChecking = false; 
-               this.services.update(list => [...list]);
-            }
-          });
+          // Using native fetch with 'no-cors' mode to avoid CORS blocks.
+          // In 'no-cors' mode, we can't read the response body, but we know if the server responded.
+          fetch(env.heartbeatUrl, { mode: 'no-cors', cache: 'no-cache' })
+            .then(() => {
+              s.hbStatus = 'Running';
+              s.isChecking = false;
+              this.services.update(list => [...list]);
+            })
+            .catch(() => {
+              s.hbStatus = 'Stopped';
+              s.isChecking = false;
+              this.services.update(list => [...list]);
+            });
         }
       }
     });
