@@ -273,28 +273,45 @@ export class DeployComponent implements OnInit {
   private addDeploymentSummary() {
     const summaryHeader = this.translate.instant('deploymentSummary');
     const totalTimeLabel = this.translate.instant('totalTime');
-    const buildTimeLabel = this.translate.instant('buildTime');
     const totalDuration = this.elapsedTime();
     
     this.logs.update(prev => [...prev, 
-      { sessionId: 'client', level: 'SUCCESS', message: '========================================', timestamp: new Date().toISOString() },
+      { sessionId: 'client', level: 'SUCCESS', message: '========================================================================', timestamp: new Date().toISOString() },
       { sessionId: 'client', level: 'SUCCESS', message: `📊 ${summaryHeader.toUpperCase()}`, timestamp: new Date().toISOString() },
-      { sessionId: 'client', level: 'SUCCESS', message: '----------------------------------------', timestamp: new Date().toISOString() }
+      { sessionId: 'client', level: 'SUCCESS', message: '------------------------------------------------------------------------', timestamp: new Date().toISOString() }
     ]);
 
     const progress = this.deploymentProgress();
     Object.keys(progress).forEach(id => {
       const name = this.getServiceName(id);
-      const bTime = progress[id].buildTime || 'N/A';
+      
+      const getIcon = (status: string) => {
+        if (status === 'success') return '✅';
+        if (status === 'error') return '❌';
+        if (status === 'skip') return '⏭️';
+        return '⚪';
+      };
+
+      const bStatus = getIcon(progress[id].compiled);
+      const dStatus = getIcon(progress[id].deployed);
+      const hStatus = getIcon(progress[id].heartbeat);
+      const bTime = progress[id].buildTime ? `(${progress[id].buildTime})` : '';
+      
+      // Use fixed width padding for alignment in monospace font
+      const namePart = name.padEnd(25);
+      const buildPart = `${bStatus} ${bTime}`.padEnd(15);
+      const deployPart = `${dStatus}`.padEnd(10);
+      const hbPart = `${hStatus}`;
+
       this.logs.update(prev => [...prev, 
-        { sessionId: 'client', level: 'INFO', message: `🔹 ${name}: ${buildTimeLabel}: ${bTime}`, timestamp: new Date().toISOString() }
+        { sessionId: 'client', level: 'INFO', message: `🔹 ${namePart} | Build: ${buildPart} | Deploy: ${deployPart} | HB: ${hbPart}`, timestamp: new Date().toISOString() }
       ]);
     });
 
     this.logs.update(prev => [...prev, 
-      { sessionId: 'client', level: 'SUCCESS', message: '----------------------------------------', timestamp: new Date().toISOString() },
+      { sessionId: 'client', level: 'SUCCESS', message: '------------------------------------------------------------------------', timestamp: new Date().toISOString() },
       { sessionId: 'client', level: 'SUCCESS', message: `🏁 ${totalTimeLabel}: ${totalDuration}`, timestamp: new Date().toISOString() },
-      { sessionId: 'client', level: 'SUCCESS', message: '========================================', timestamp: new Date().toISOString() }
+      { sessionId: 'client', level: 'SUCCESS', message: '========================================================================', timestamp: new Date().toISOString() }
     ]);
     
     this.scrollToBottom();
