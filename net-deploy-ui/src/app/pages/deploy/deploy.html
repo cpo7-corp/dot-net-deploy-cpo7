@@ -78,27 +78,27 @@
 
             <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" id="checkPull"
-                [ngModel]="deployPull()" (ngModelChange)="deployPull.set($event)" [disabled]="deploying()">
+                [ngModel]="deploySvc.deployPull()" (ngModelChange)="deploySvc.deployPull.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkPull" style="cursor: pointer;"
-                [class.text-white]="deployPull()" [class.text-secondary]="!deployPull()">
+                [class.text-white]="deploySvc.deployPull()" [class.text-secondary]="!deploySvc.deployPull()">
                 <i class="bi bi-cloud-arrow-down me-1"></i> {{ 'strategyPull' | translate }}
               </label>
             </div>
 
             <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" id="checkBuild"
-                [ngModel]="deployBuild()" (ngModelChange)="deployBuild.set($event)" [disabled]="deploying()">
+                [ngModel]="deploySvc.deployBuild()" (ngModelChange)="deploySvc.deployBuild.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkBuild" style="cursor: pointer;"
-                [class.text-white]="deployBuild()" [class.text-secondary]="!deployBuild()">
+                [class.text-white]="deploySvc.deployBuild()" [class.text-secondary]="!deploySvc.deployBuild()">
                 <i class="bi bi-hammer me-1"></i> {{ 'strategyBuild' | translate }}
               </label>
             </div>
 
             <div class="form-check">
               <input class="form-check-input" type="checkbox" id="checkDeploy"
-                [ngModel]="deployTransfer()" (ngModelChange)="deployTransfer.set($event)" [disabled]="deploying()">
+                [ngModel]="deploySvc.deployTransfer()" (ngModelChange)="deploySvc.deployTransfer.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkDeploy" style="cursor: pointer;"
-                [class.text-white]="deployTransfer()" [class.text-secondary]="!deployTransfer()">
+                [class.text-white]="deploySvc.deployTransfer()" [class.text-secondary]="!deploySvc.deployTransfer()">
                 <i class="bi bi-rocket-takeoff me-1"></i> {{ 'strategyTransfer' | translate }}
               </label>
             </div>
