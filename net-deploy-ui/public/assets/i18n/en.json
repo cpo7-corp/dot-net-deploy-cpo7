@@ -4,29 +4,6 @@
   "NAV_DEPLOY": "Deploy App",
   "NAV_LOGS": "History Logs",
   "NAV_SETTINGS": "Settings",
-  "DASHBOARD": {
-    "TITLE": "Dashboard Overview",
-    "LOADING": "Loading services status...",
-    "NO_SERVICES": "No Services Configured",
-    "NO_SERVICES_DESC": "Go to settings to configure services or deploy some new ones.",
-    "NAME": "Service Name",
-    "STATUS": "Status",
-    "TYPE": "Type",
-    "IIS_SITE": "IIS Site / Service",
-    "LAST_DEPLOY": "Last Deploy",
-    "RUNNING": "Running",
-    "STOPPED": "Stopped",
-    "ERROR": "Error",
-    "UNKNOWN": "Unknown",
-    "NEVER": "Never",
-    "TYPES": {
-      "WebApi": ".NET Web API",
-      "Mvc": ".NET MVC Site",
-      "WindowsService": "Windows Service",
-      "Angular": "Angular App",
-      "React": "React App"
-    }
-  },
   "SETTINGS": {
     "TITLE": "Configuration Settings",
     "TAB_GIT": "Git Repository",
