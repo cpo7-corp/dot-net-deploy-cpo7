@@ -1,6 +1,9 @@
 using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.Services.Entities;
 using NET.Deploy.Api.Logic.Settings.Entities;
+using NET.Deploy.Api.Logic.EnvConfigs;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace NET.Deploy.Api.Logic.Deploy;
 
@@ -9,11 +12,12 @@ public class DeployLogic(
     GitLogic gitLogic,
     BuildManager buildManager,
     TransferManager transferManager,
-    ProcessRunner processRunner)
+    ProcessRunner processRunner,
+    EnvConfigsLogic envConfigsLogic)
 {
     public async Task<bool> DeployServiceAsync(
-        ServiceDefinition service,
-        AppSettings settings,
+        ServiceDefinitionDB service,
+        AppSettingsDB settings,
         LogCallback log,
         string? branchOverride = null,
         VpsSettings? vpsOverride = null,
@@ -53,8 +57,8 @@ public class DeployLogic(
     }
 
     public async Task<bool> PrepGitOnlyAsync(
-        ServiceDefinition service,
-        AppSettings settings,
+        ServiceDefinitionDB service,
+        AppSettingsDB settings,
         LogCallback log,
         string? branchOverride = null,
         bool forceClean = false)
@@ -68,8 +72,8 @@ public class DeployLogic(
     }
 
     private async Task<bool> DeployServiceInternalAsync(
-        ServiceDefinition service,
-        AppSettings settings,
+        ServiceDefinitionDB service,
+        AppSettingsDB settings,
         LogCallback log,
         string? branchOverride,
         VpsSettings? vpsOverride,
@@ -149,7 +153,7 @@ public class DeployLogic(
         return await ExecuteTransferPhaseAsync(service, publishOutput, vpsOverride, log, isWindowsService);
     }
 
-    private async Task<bool> ExecuteTransferPhaseAsync(ServiceDefinition service, string publishOutput, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService)
+    private async Task<bool> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, string publishOutput, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService)
     {
         var targetPath = service.DeployTargetPath;
         if (string.IsNullOrWhiteSpace(targetPath))
@@ -157,6 +161,8 @@ public class DeployLogic(
             await log("ERROR", "❌ Missing DeployTargetPath for service.", service.Id);
             return false;
         }
+
+        await ApplyEnvironmentConfigsAsync(service, publishOutput, log, service.Id);
 
         try
         {
@@ -269,13 +275,13 @@ public class DeployLogic(
         }
     }
 
-    private static string GetEffectiveBranch(ServiceDefinition service, string parsedBranch, string? branchOverride)
+    private static string GetEffectiveBranch(ServiceDefinitionDB service, string parsedBranch, string? branchOverride)
     {
         return !string.IsNullOrWhiteSpace(branchOverride) ? branchOverride 
              : (!string.IsNullOrWhiteSpace(service.Branch) && service.Branch != "main" ? service.Branch : parsedBranch);
     }
 
-    private static string GetEffectiveProjectPath(ServiceDefinition service, string parsedPath)
+    private static string GetEffectiveProjectPath(ServiceDefinitionDB service, string parsedPath)
     {
         return string.IsNullOrWhiteSpace(service.ProjectPath) ? parsedPath : service.ProjectPath;
     }
@@ -284,5 +290,109 @@ public class DeployLogic(
     {
         if (string.IsNullOrEmpty(path)) return path;
         return path.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+    }
+
+    private async Task ApplyEnvironmentConfigsAsync(ServiceDefinitionDB service, string publishOutput, LogCallback log, string? serviceId)
+    {
+        if (service.EnvConfigSetIds == null || service.EnvConfigSetIds.Count == 0) return;
+
+        await log("INFO", $"⚙️ Applying Environment Configurations ({service.EnvConfigSetIds.Count} sets)...", serviceId);
+
+        var configSets = await envConfigsLogic.GetByIdsAsync(service.EnvConfigSetIds);
+
+        foreach (var configSet in configSets)
+        {
+            // 1. Handle File Renames (Source -> Target Overwrite)
+            if (configSet.FileRenames != null && configSet.FileRenames.Count > 0)
+            {
+                foreach (var rename in configSet.FileRenames)
+                {
+                    var sourcePath = Path.Combine(publishOutput, rename.SourceFileName);
+                    var targetPath = Path.Combine(publishOutput, rename.TargetFileName);
+                    
+                    if (File.Exists(sourcePath))
+                    {
+                        try
+                        {
+                            File.Copy(sourcePath, targetPath, overwrite: true);
+                            await log("INFO", $"🔄 File Rename/Copy: '{rename.SourceFileName}' -> '{rename.TargetFileName}' (Set: {configSet.Name})", serviceId);
+                        }
+                        catch (Exception ex)
+                        {
+                            await log("WARNING", $"⚠️ Could not copy file {rename.SourceFileName}: {ex.Message}", serviceId);
+                        }
+                    }
+                    else
+                    {
+                        await log("WARNING", $"⚠️ Source file '{rename.SourceFileName}' not found. Cannot perform rename/copy.", serviceId);
+                    }
+                }
+            }
+
+            // 2. Handle JSON Key Overrides
+            var targetFile = Path.Combine(publishOutput, configSet.TargetFileName);
+            if (!File.Exists(targetFile))
+            {
+                // If it's just meant for file renames, it's fine. 
+                // But if it has variables, we should warning.
+                if (configSet.Variables != null && configSet.Variables.Count > 0)
+                    await log("WARNING", $"⚠️ Target config file '{configSet.TargetFileName}' not found in publish output. Skipping set '{configSet.Name}'.", serviceId);
+                
+                continue;
+            }
+
+            try
+            {
+                var jsonString = await File.ReadAllTextAsync(targetFile);
+                var jsonNode = JsonNode.Parse(jsonString);
+
+                if (jsonNode != null)
+                {
+                    int applied = 0;
+                    foreach (var variable in configSet.Variables)
+                    {
+                        var keys = variable.Key.Split(new[] { ':', '.' }, StringSplitOptions.RemoveEmptyEntries);
+                        JsonNode? current = jsonNode;
+                        
+                        // traverse down to the parent of the target key
+                        for (int i = 0; i < keys.Length - 1; i++)
+                        {
+                            var keyNode = current?[keys[i]];
+                            if (keyNode == null)
+                            {
+                                if (current is JsonObject parentObj)
+                                {
+                                    parentObj[keys[i]] = new JsonObject();
+                                    current = parentObj[keys[i]];
+                                }
+                                else
+                                {
+                                    break; // Type mismatch, not an object
+                                }
+                            }
+                            else
+                            {
+                                current = keyNode;
+                            }
+                        }
+
+                        // update the value
+                        if (current != null && current is JsonObject currentObj)
+                        {
+                            currentObj[keys.Last()] = JsonValue.Create(variable.Value);
+                            applied++;
+                        }
+                    }
+
+                    var updatedJson = jsonNode.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+                    await File.WriteAllTextAsync(targetFile, updatedJson);
+                    await log("SUCCESS", $"✅ Successfully applied {applied} variables to {configSet.TargetFileName} (Set: {configSet.Name}).", serviceId);
+                }
+            }
+            catch (Exception ex)
+            {
+                await log("ERROR", $"❌ Failed to apply config set '{configSet.Name}' to '{configSet.TargetFileName}': {ex.Message}", serviceId);
+            }
+        }
     }
 }

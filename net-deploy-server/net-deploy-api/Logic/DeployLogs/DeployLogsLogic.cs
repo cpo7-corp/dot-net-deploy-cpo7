@@ -6,13 +6,13 @@ namespace NET.Deploy.Api.Logic.DeployLogs;
 
 public class DeployLogsLogic(MongoDbContext db)
 {
-    public async Task AddAsync(DeployLogEntry entry) =>
+    public async Task AddAsync(DeployLogEntryDB entry) =>
         await db.DeployLogs.InsertOneAsync(entry);
 
-    public async Task AddRangeAsync(IEnumerable<DeployLogEntry> entries) =>
+    public async Task AddRangeAsync(IEnumerable<DeployLogEntryDB> entries) =>
         await db.DeployLogs.InsertManyAsync(entries);
 
-    public async Task<List<DeployLogEntry>> GetBySessionAsync(string sessionId) =>
+    public async Task<List<DeployLogEntryDB>> GetBySessionAsync(string sessionId) =>
         await db.DeployLogs
             .Find(e => e.SessionId == sessionId)
             .SortBy(e => e.Timestamp)

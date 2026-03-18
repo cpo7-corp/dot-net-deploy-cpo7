@@ -2,6 +2,7 @@ using MongoDB.Driver;
 using NET.Deploy.Api.Logic.DeployLogs.Entities;
 using NET.Deploy.Api.Logic.Services.Entities;
 using NET.Deploy.Api.Logic.Settings.Entities;
+using NET.Deploy.Api.Logic.EnvConfigs.Entities;
 
 namespace NET.Deploy.Api.Data;
 
@@ -21,14 +22,18 @@ public class MongoDbContext
     }
 
     /// <summary>Singleton document – application settings (Git + VPS)</summary>
-    public IMongoCollection<AppSettings> Settings =>
-        _database.GetCollection<AppSettings>("settings");
+    public IMongoCollection<AppSettingsDB> Settings =>
+        _database.GetCollection<AppSettingsDB>("settings");
 
     /// <summary>One document per deployable .NET service</summary>
-    public IMongoCollection<ServiceDefinition> Services =>
-        _database.GetCollection<ServiceDefinition>("services");
+    public IMongoCollection<ServiceDefinitionDB> Services =>
+        _database.GetCollection<ServiceDefinitionDB>("services");
 
     /// <summary>Log lines written during deploy runs</summary>
-    public IMongoCollection<DeployLogEntry> DeployLogs =>
-        _database.GetCollection<DeployLogEntry>("deploy_logs");
+    public IMongoCollection<DeployLogEntryDB> DeployLogs =>
+        _database.GetCollection<DeployLogEntryDB>("deploy_logs");
+
+    /// <summary>Environment configuration sets (secrets, connection strings, etc.)</summary>
+    public IMongoCollection<EnvConfigSetDB> EnvConfigSets =>
+        _database.GetCollection<EnvConfigSetDB>("env_config_sets");
 }

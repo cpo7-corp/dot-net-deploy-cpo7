@@ -30,13 +30,13 @@ public class DeployController(
 
         var sessionId = Guid.NewGuid().ToString();
         var settings = await settingsLogic.GetAsync();
-        var logEntries = new List<DeployLogEntry>();
+        var logEntries = new List<DeployLogEntryDB>();
 
         var responseLock = new SemaphoreSlim(1, 1);
 
         async Task Log(string level, string message, string? serviceId = null)
         {
-            var entry = new DeployLogEntry
+            var entry = new DeployLogEntryDB
             {
                 SessionId = sessionId,
                 Level = level,
@@ -74,7 +74,7 @@ public class DeployController(
         var repoPrepTasks = new System.Collections.Concurrent.ConcurrentDictionary<string, Task<bool>>();
 
         // Helper to get or start a prep task for a specific service's repository
-        Task<bool> EnsureRepoUpdated(ServiceDefinition srv, string? branchOverride)
+        Task<bool> EnsureRepoUpdated(ServiceDefinitionDB srv, string? branchOverride)
         {
             var branchKey = branchOverride ?? srv.Branch;
             var repoKey = $"{srv.RepoUrl}|{branchKey}";
@@ -156,7 +156,7 @@ public class DeployController(
 
     /// <summary>Returns the log entries of a previous deploy session.</summary>
     [HttpGet("logs/{sessionId}")]
-    public async Task<ActionResult<List<DeployLogEntry>>> GetLogs(string sessionId) =>
+    public async Task<ActionResult<List<DeployLogEntryDB>>> GetLogs(string sessionId) =>
         Ok(await deployLogsLogic.GetBySessionAsync(sessionId));
 
     /// <summary>Returns IDs of the most recent deploy sessions.</summary>

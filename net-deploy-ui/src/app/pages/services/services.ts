@@ -3,7 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
 import { ServicesMonitorService } from '../../services/services-monitor.service';
-import { ServiceDefinition, ServiceStatus } from '../../models/api-models';
+import { EnvConfigsService } from '../../services/env-configs.service';
+import { ServiceDefinition, ServiceStatus, EnvConfigSet } from '../../models/api-models';
 
 @Component({
   selector: 'app-services',
@@ -14,8 +15,10 @@ import { ServiceDefinition, ServiceStatus } from '../../models/api-models';
 })
 export class ServicesComponent implements OnInit {
   private servicesSvc = inject(ServicesMonitorService);
+  private envConfigsSvc = inject(EnvConfigsService);
 
   services = signal<ServiceStatus[]>([]);
+  envConfigs = signal<EnvConfigSet[]>([]);
   loading = signal<boolean>(true);
   newService: Partial<ServiceDefinition> = this.resetNewService();
   
@@ -25,6 +28,11 @@ export class ServicesComponent implements OnInit {
 
   ngOnInit() {
     this.loadData();
+    this.loadEnvConfigs();
+  }
+
+  loadEnvConfigs() {
+    this.envConfigsSvc.getAll().then(data => this.envConfigs.set(data));
   }
 
   loadData() {
@@ -94,6 +102,18 @@ export class ServicesComponent implements OnInit {
   }
 
   private resetNewService(): Partial<ServiceDefinition> {
-    return { name: '', repoUrl: '', projectPath: '', iisSiteName: '', serviceType: 'WebApi', enabled: true, deployTargetPath: '', branch: '', compileSingleFile: false, heartbeatUrl: '' };
+    return { name: '', repoUrl: '', projectPath: '', iisSiteName: '', serviceType: 'WebApi', deployTargetPath: '', branch: '', compileSingleFile: false, heartbeatUrl: '', envConfigSetIds: [] };
+  }
+
+  toggleEnvConfig(service: Partial<ServiceDefinition>, configId: string) {
+    if (!service.envConfigSetIds) {
+      service.envConfigSetIds = [];
+    }
+    const idx = service.envConfigSetIds.indexOf(configId);
+    if (idx >= 0) {
+      service.envConfigSetIds.splice(idx, 1);
+    } else {
+      service.envConfigSetIds.push(configId);
+    }
   }
 }

@@ -3,7 +3,8 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace NET.Deploy.Api.Logic.Services.Entities;
 
-public class ServiceDefinition
+[BsonIgnoreExtraElements]
+public class ServiceDefinitionDB
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]
@@ -21,13 +22,13 @@ public class ServiceDefinition
     /// <summary>WebApi | Mvc | Worker</summary>
     public string ServiceType { get; set; } = "WebApi";
 
-    public bool Enabled { get; set; } = true;
-
     /// <summary>Absolute path on the VPS where built output is deployed</summary>
     public string DeployTargetPath { get; set; } = string.Empty;
 
     public string Branch { get; set; } = "main";
     public bool CompileSingleFile { get; set; } = false;
+
+    public List<string> EnvConfigSetIds { get; set; } = new();
     public string HeartbeatUrl { get; set; } = string.Empty;
     public DateTime? LastDeployed { get; set; }
 }

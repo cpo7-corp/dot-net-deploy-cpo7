@@ -3,7 +3,8 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace NET.Deploy.Api.Logic.Settings.Entities;
 
-public class AppSettings
+[BsonIgnoreExtraElements]
+public class AppSettingsDB
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]

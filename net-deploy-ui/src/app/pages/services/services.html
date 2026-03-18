@@ -19,7 +19,7 @@
             <tr class="text-secondary small text-uppercase">
               <th class="ps-4">Name</th>
               <th>Type</th>
-              <th>Git Address</th>
+              <th>Last Deploy</th>
               <th>Site/Service Name</th>
               <th>Status</th>
               <th class="text-end pe-4">Actions</th>
@@ -39,7 +39,10 @@
               <tr (click)="openEditModal(s)">
                 <td class="ps-4 fw-bold text-white">{{s.name}}</td>
                 <td><span class="badge bg-secondary opacity-75">{{s.serviceType}}</span></td>
-                <td class="text-truncate" style="max-width: 300px;">{{s.repoUrl}}</td>
+                <td>
+                  <span class="text-secondary small" *ngIf="!s.lastDeployed">Never</span>
+                  <span class="text-white-50 small" *ngIf="s.lastDeployed">{{s.lastDeployed | date:'dd/MM/yyyy HH:mm'}}</span>
+                </td>
                 <td><code class="text-info">{{s.iisSiteName}}</code></td>
                 <td>
                   <span class="badge text-white" [ngClass]="{
@@ -106,6 +109,24 @@
               <div class="col-md-12">
                 <label class="form-label text-secondary small">Heartbeat URL (Check if up after deploy)</label>
                 <input type="text" class="form-control bg-dark text-white border-secondary shadow-none" [(ngModel)]="newService.heartbeatUrl" name="s_heartbeat" placeholder="http://localhost:7083/heartbeat">
+              </div>
+              <div class="col-md-12">
+                <label class="form-label text-secondary small">Environment Configurations</label>
+                <div class="border border-secondary rounded p-2" style="max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.3);">
+                  @if (envConfigs().length === 0) {
+                    <div class="text-secondary small text-center py-2">No config sets found. Create them first.</div>
+                  }
+                  @for (c of envConfigs(); track c.id) {
+                    <div class="form-check mb-1">
+                      <input class="form-check-input bg-dark border-secondary" type="checkbox" [id]="'new_cfg_' + c.id"
+                             [checked]="newService.envConfigSetIds?.includes(c.id!)"
+                             (change)="toggleEnvConfig(newService, c.id!)">
+                      <label class="form-check-label text-white d-flex align-items-center gap-2" [for]="'new_cfg_' + c.id">
+                        {{c.name}} <span class="badge bg-info mt-1 text-dark" style="font-size: 0.65rem;">{{c.environmentId}}</span>
+                      </label>
+                    </div>
+                  }
+                </div>
               </div>
               
               @if (newService.serviceType === 'WindowsService') {
@@ -178,20 +199,30 @@
                 <label class="form-label text-secondary small">Heartbeat URL</label>
                 <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.heartbeatUrl" placeholder="http://localhost:7083/heartbeat">
               </div>
-              <div class="col-12">
-                <div class="d-flex gap-4">
-                  <div class="form-check form-switch p-0 ps-3">
-                    <input class="form-check-input ms-0 me-2" type="checkbox" [(ngModel)]="selectedService.enabled" id="swEnabled">
-                    <label class="form-check-label text-white" for="swEnabled">Service Enabled</label>
-                  </div>
+              <div class="col-md-12">
+                <label class="form-label text-secondary small">Environment Configurations</label>
+                <div class="border border-secondary rounded p-2" style="max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.3);">
+                  @if (envConfigs().length === 0) {
+                    <div class="text-secondary small text-center py-2">No config sets found. Create them first.</div>
+                  }
+                  @for (c of envConfigs(); track c.id) {
+                    <div class="form-check mb-1">
+                      <input class="form-check-input bg-dark border-secondary" type="checkbox" [id]="'edit_cfg_' + c.id"
+                             [checked]="selectedService.envConfigSetIds?.includes(c.id!)"
+                             (change)="toggleEnvConfig(selectedService, c.id!)">
+                      <label class="form-check-label text-white d-flex align-items-center gap-2" [for]="'edit_cfg_' + c.id">
+                        {{c.name}} <span class="badge bg-info mt-1 text-dark" style="font-size: 0.65rem;">{{c.environmentId}}</span>
+                      </label>
+                    </div>
+                  }
+                </div>
+              </div>
                   @if (selectedService.serviceType === 'WindowsService') {
                     <div class="form-check form-switch p-0 ps-3">
                       <input class="form-check-input ms-0 me-2" type="checkbox" [(ngModel)]="selectedService.compileSingleFile" id="swSingleFile">
                       <label class="form-check-label text-info" for="swSingleFile">Publish as Single File</label>
                     </div>
                   }
-                </div>
-              </div>
             </div>
           </div>
           <div class="modal-footer border-secondary d-flex justify-content-between p-3 bg-dark bg-opacity-50">

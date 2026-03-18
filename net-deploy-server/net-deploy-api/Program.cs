@@ -5,6 +5,7 @@ using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.IIS;
 using NET.Deploy.Api.Logic.Services;
 using NET.Deploy.Api.Logic.Settings;
+using NET.Deploy.Api.Logic.EnvConfigs;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -41,6 +42,7 @@ builder.Services.AddSingleton<SettingsLogic>();
 builder.Services.AddSingleton<ServicesLogic>();
 builder.Services.AddSingleton<DeployLogsLogic>();
 builder.Services.AddSingleton<GitLogic>();
+builder.Services.AddSingleton<EnvConfigsLogic>();
 
 // Deploy dependencies
 builder.Services.AddSingleton<ProcessRunner>();

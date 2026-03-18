@@ -9,10 +9,10 @@ namespace NET.Deploy.Api.Controllers;
 public class SettingsController(SettingsLogic settingsLogic) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<AppSettings>> Get() =>
+    public async Task<ActionResult<AppSettingsDB>> Get() =>
         Ok(await settingsLogic.GetAsync());
 
     [HttpPut]
-    public async Task<ActionResult<AppSettings>> Save([FromBody] AppSettings settings) =>
+    public async Task<ActionResult<AppSettingsDB>> Save([FromBody] AppSettingsDB settings) =>
         Ok(await settingsLogic.SaveAsync(settings));
 }

@@ -31,7 +31,6 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
                 Branch = s.Branch,
                 DeployTargetPath = s.DeployTargetPath,
                 ProjectPath = s.ProjectPath,
-                Enabled = s.Enabled,
                 LastDeployed = s.LastDeployed,
                 CompileSingleFile = s.CompileSingleFile,
                 HeartbeatUrl = s.HeartbeatUrl,
@@ -43,7 +42,7 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
     }
 
     [HttpPost]
-    public async Task<ActionResult<ServiceDefinition>> Create([FromBody] ServiceDefinition service)
+    public async Task<ActionResult<ServiceDefinitionDB>> Create([FromBody] ServiceDefinitionDB service)
     {
         logger.LogInformation("Creating service: {Name}", service.Name);
         var created = await servicesLogic.CreateAsync(service);
@@ -51,7 +50,7 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
     }
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<ServiceDefinition>> Update(string id, [FromBody] ServiceDefinition service)
+    public async Task<ActionResult<ServiceDefinitionDB>> Update(string id, [FromBody] ServiceDefinitionDB service)
     {
         var updated = await servicesLogic.UpdateAsync(id, service);
         return updated is null ? NotFound() : Ok(updated);

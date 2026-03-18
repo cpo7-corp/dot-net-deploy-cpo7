@@ -13,7 +13,7 @@ import { ServiceStatus } from '../../models/api-models';
 })
 export class DashboardComponent implements OnInit {
   private monitor = inject(ServicesMonitorService);
-  
+
   services = signal<ServiceStatus[]>([]);
   loading = signal<boolean>(true);
 

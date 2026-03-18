@@ -1,10 +1,10 @@
 import { Routes } from '@angular/router';
 
 export const routes: Routes = [
-  { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
+  { path: '', redirectTo: 'services', pathMatch: 'full' },
   { 
-    path: 'dashboard', 
-    loadComponent: () => import('./pages/dashboard/dashboard').then(c => c.DashboardComponent) 
+    path: 'services', 
+    loadComponent: () => import('./pages/services/services').then(c => c.ServicesComponent) 
   },
   { 
     path: 'deploy', 
@@ -15,8 +15,8 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/logs/logs').then(c => c.LogsComponent) 
   },
   { 
-    path: 'services', 
-    loadComponent: () => import('./pages/services/services').then(c => c.ServicesComponent) 
+    path: 'env-configs', 
+    loadComponent: () => import('./pages/env-configs/env-configs').then(c => c.EnvConfigsComponent) 
   },
   { 
     path: 'settings', 

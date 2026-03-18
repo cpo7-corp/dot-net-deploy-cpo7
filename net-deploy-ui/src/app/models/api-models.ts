@@ -26,13 +26,32 @@ export interface ServiceDefinition {
   projectPath: string;
   iisSiteName: string;
   serviceType: 'WebApi' | 'Mvc' | 'WindowsService' | 'Angular' | 'React';
-  enabled: boolean;
   branch: string;
   compileSingleFile: boolean;
   heartbeatUrl: string;
   deployTargetPath: string;
   lastDeployed?: string | Date;
+  envConfigSetIds?: string[];
   _saved?: boolean; // UI state only
+}
+
+export interface EnvVariable {
+  key: string;
+  value: string;
+}
+
+export interface FileRename {
+  sourceFileName: string;
+  targetFileName: string;
+}
+
+export interface EnvConfigSet {
+  id?: string;
+  name: string;
+  environmentId: string;
+  targetFileName: string;
+  variables: EnvVariable[];
+  fileRenames: FileRename[];
 }
 
 export interface ServiceStatus extends ServiceDefinition {

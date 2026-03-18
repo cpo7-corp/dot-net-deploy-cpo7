@@ -3,7 +3,8 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace NET.Deploy.Api.Logic.DeployLogs.Entities;
 
-public class DeployLogEntry
+[BsonIgnoreExtraElements]
+public class DeployLogEntryDB
 {
     [BsonId]
     [BsonRepresentation(BsonType.ObjectId)]

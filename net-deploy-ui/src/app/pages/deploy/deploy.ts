@@ -108,12 +108,12 @@ export class DeployComponent implements OnInit {
     this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId(), forceClean, shouldCloneAll, shouldSkipBuild).subscribe({
       next: (entry) => {
         this.logs.update(prev => [...prev, entry]);
-        
+
         // Track failed services
         if (entry.level === 'ERROR' && entry.serviceId) {
           this.failedServiceIds.update(fails => [...new Set([...fails, entry.serviceId!])]);
         }
-        
+
         this.scrollToBottom();
       },
       complete: () => {
@@ -160,7 +160,7 @@ export class DeployComponent implements OnInit {
     this.startTime = Date.now();
     this.elapsedTime.set('00:00');
     if (this.timerInterval) clearInterval(this.timerInterval);
-    
+
     this.timerInterval = setInterval(() => {
       const seconds = Math.floor((Date.now() - this.startTime) / 1000);
       const mins = Math.floor(seconds / 60);

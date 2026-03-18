@@ -3,7 +3,7 @@
   "NAV_DASHBOARD": "לוח בקרה",
   "NAV_DEPLOY": "העלאת שרת",
   "NAV_LOGS": "היסטוריית פריסות",
-  "NAV_SETTINGS": "הגדרות חשבון",
+  "NAV_SETTINGS": "הגדרות ",
   "DASHBOARD": {
     "TITLE": "סקירת לוח בקרה",
     "LOADING": "טוען סטטוס שירותים...",
@@ -31,7 +31,7 @@
     "TITLE": "הגדרות תצורה",
     "TAB_GIT": "הגדרות Git",
     "TAB_VPS": "פרטי שרת VPS",
-    "TAB_SERVICES": "הגדרות שירותים",
+    "TAB_SERVICES": "שירותים",
     "GIT_CONNECTION": "חיבור ל-Git",
     "REPO_URL": "כתובת פרויקט Git",
     "BRANCH": "ענף (Branch)",

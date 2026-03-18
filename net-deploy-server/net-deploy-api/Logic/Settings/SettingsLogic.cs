@@ -6,10 +6,10 @@ namespace NET.Deploy.Api.Logic.Settings;
 
 public class SettingsLogic(MongoDbContext db)
 {
-    public async Task<AppSettings> GetAsync() =>
-        await db.Settings.Find(_ => true).FirstOrDefaultAsync() ?? new AppSettings();
+    public async Task<AppSettingsDB> GetAsync() =>
+        await db.Settings.Find(_ => true).FirstOrDefaultAsync() ?? new AppSettingsDB();
 
-    public async Task<AppSettings> SaveAsync(AppSettings settings)
+    public async Task<AppSettingsDB> SaveAsync(AppSettingsDB settings)
     {
         var existing = await db.Settings.Find(_ => true).FirstOrDefaultAsync();
 
@@ -21,7 +21,7 @@ public class SettingsLogic(MongoDbContext db)
         {
             settings.Id = existing.Id;
             await db.Settings.ReplaceOneAsync(
-                Builders<AppSettings>.Filter.Eq(s => s.Id, existing.Id),
+                Builders<AppSettingsDB>.Filter.Eq(s => s.Id, existing.Id),
                 settings);
         }
 
