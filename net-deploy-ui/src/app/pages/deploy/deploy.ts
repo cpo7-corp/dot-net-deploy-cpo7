@@ -187,15 +187,19 @@ export class DeployComponent implements OnInit {
         row.buildStartTime = Date.now();
     }
     if (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists') || message.includes('❌ Preparation failed')) {
-        if (message.includes('✅ [Prep] Prepared')) row.compiled = 'success';
-        else if (message.includes('⏭️ [Prep] Build output already exists')) row.compiled = 'skip';
-        else row.compiled = 'error';
+        if (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists')) {
+            row.compiled = 'success';
+        }
+        else {
+            row.compiled = 'error';
+        }
 
         if (row.buildStartTime) {
             const duration = ((Date.now() - row.buildStartTime) / 1000).toFixed(1);
             row.buildTime = duration + 's';
         }
     }
+
 
     // Deployed
     if (message.includes('🚀 Uploading files') || message.includes('📂 Copying files')) row.deployed = 'process';
