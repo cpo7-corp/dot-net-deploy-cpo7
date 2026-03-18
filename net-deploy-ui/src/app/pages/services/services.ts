@@ -33,7 +33,7 @@ export class ServicesComponent implements OnInit {
     this.servicesSvc.getAll().subscribe({
       next: (data) => {
         console.log('Services received:', data);
-        this.services.set(data);
+        this.services.set(data.sort((a, b) => a.name.localeCompare(b.name)));
         this.loading.set(false);
       },
       error: (err) => {

@@ -38,7 +38,8 @@ export class DeployComponent implements OnInit {
   ngOnInit() {
     this.servicesSvc.getAll().subscribe({
       next: (data) => {
-        this.services.set(data);
+        const sorted = data.sort((a, b) => a.name.localeCompare(b.name));
+        this.services.set(sorted);
         // Initialize default branch for each service
         data.forEach(s => {
           if (s.id) this.serviceBranches[s.id] = s.branch || 'main';
@@ -121,7 +122,7 @@ export class DeployComponent implements OnInit {
         // Reload services to update status/last deployed date
         this.loading.set(true);
         this.servicesSvc.getAll().subscribe(data => {
-          this.services.set(data);
+          this.services.set(data.sort((a, b) => a.name.localeCompare(b.name)));
           this.loading.set(false);
         });
       },
