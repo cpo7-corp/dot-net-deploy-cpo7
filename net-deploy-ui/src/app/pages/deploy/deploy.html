@@ -201,8 +201,8 @@
 </div>
 
 <ng-template #statusIcon let-status="status">
-  @if (status === 'success') { <i class="bi bi-check-lg text-success fs-5"></i> }
-  @else if (status === 'error') { <i class="bi bi-x-lg text-danger fs-5"></i> }
+  @if (status === 'success') { <i class="bi bi-check-circle-fill text-success fs-5"></i> }
+  @else if (status === 'error') { <i class="bi bi-x-circle-fill text-danger fs-5"></i> }
   @else if (status === 'process') { <div class="spinner-border spinner-border-sm text-primary" role="status"></div> }
   @else if (status === 'skip') { <i class="bi bi-skip-forward-fill text-secondary opacity-50"></i> }
   @else { <span class="text-secondary opacity-25">—</span> }
