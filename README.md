@@ -4,6 +4,9 @@
 
 NET Deploy is a powerful tool designed to automate the process of pulling, building, and deploying .NET services (WebAPI, MVC, Workers) and Node.js applications to remote VPS or local servers.
 
+![Image 1](1.png)
+![Image 2](2.png)
+
 ---
 
 **© 2026 CPO7 - PROPRIETARY SOFTWARE. Free for learning, paid for commercial use.**
