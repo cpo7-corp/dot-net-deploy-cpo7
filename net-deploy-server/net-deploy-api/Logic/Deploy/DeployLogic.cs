@@ -1,9 +1,17 @@
+using Microsoft.Extensions.Logging;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
 using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.Services;
 using NET.Deploy.Api.Logic.Services.Entities;
 using NET.Deploy.Api.Logic.Settings.Entities;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+
+
 
 namespace NET.Deploy.Api.Logic.Deploy;
 
@@ -15,6 +23,96 @@ public class DeployLogic(
     ProcessRunner processRunner,
     EnvConfigsLogic envConfigsLogic)
 {
+    public async Task<bool> PrepAndBuildServiceAsync(
+        ServiceDefinitionDB service,
+        AppSettingsDB settings,
+        LogCallback log,
+        string environmentId,
+        string? branchOverride = null,
+        bool forceClean = false,
+        bool skipPull = false,
+        bool skipBuildIfOutputExists = false)
+    {
+        var envConfig = service.Environments.FirstOrDefault(e => e.EnvironmentId == environmentId);
+        if (envConfig == null)
+        {
+            await log("ERROR", $"❌ [Prep] Environment configuration not found for EnvironmentId: {environmentId}", service.Id);
+            return false;
+        }
+
+        var publishOutput = Path.Combine(Path.GetTempPath(), "net-deploy", service.Id ?? service.Name);
+        if (skipBuildIfOutputExists && Directory.Exists(publishOutput) && Directory.GetFileSystemEntries(publishOutput).Any())
+        {
+            await log("INFO", "⏭️ [Prep] Build output already exists and skip requested. Applying configs...", service.Id);
+            var vps = settings.VpsEnvironments.FirstOrDefault(e => e.Id == environmentId);
+            await ApplyEnvironmentConfigsAsync(envConfig, vps, publishOutput, log, service.Id);
+            return true;
+        }
+
+        var (repoUrl, gitBranch, projectPath) = gitLogic.ParseGitUrl(service.RepoUrl);
+        var effectiveBranch = GetEffectiveBranch(service, envConfig, gitBranch, branchOverride);
+        var effectiveProjectPath = NormalizePath(GetEffectiveProjectPath(service, projectPath));
+
+        if (!skipPull)
+        {
+            await log("INFO", $"📥 [Prep] Pulling latest for {service.Name} ({effectiveBranch})...", service.Id);
+            if (!await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean))
+                return false;
+        }
+
+        var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl, effectiveProjectPath);
+        var projectFullPath = Path.Combine(repoLocalPath, effectiveProjectPath);
+
+        if (Directory.Exists(publishOutput))
+        {
+            try { FileHelper.DeleteDirectoryRecursively(publishOutput); } catch { }
+        }
+
+        await log("INFO", $"🔨 [Prep] Building & publishing {service.Name}...", service.Id);
+        bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, service.Id);
+
+        if (buildSuccess)
+        {
+            var vps = settings.VpsEnvironments.FirstOrDefault(e => e.Id == environmentId);
+            await ApplyEnvironmentConfigsAsync(envConfig, vps, publishOutput, log, service.Id);
+            await log("SUCCESS", $"✅ [Prep] Prepared and configured: {service.Name}", service.Id);
+        }
+
+        return buildSuccess;
+    }
+
+    public async Task<bool> PerformServiceActionAsync(ServiceDefinitionDB service, string environmentId, string action, AppSettingsDB settings, LogCallback log)
+    {
+        var envConfig = service.Environments.FirstOrDefault(e => e.EnvironmentId == environmentId);
+        if (envConfig == null) { await log("ERROR", "❌ [Action] Missing environment config.", service.Id); return false; }
+
+        var vps = settings.VpsEnvironments.FirstOrDefault(e => e.Id == environmentId);
+        bool isWin = service.ServiceType == "WindowsService";
+
+        if (action == "restart")
+        {
+            if (isWin)
+            {
+                await ManageWindowsServiceAsync(service.IisSiteName, "stop", log, service.Id);
+                await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id, envConfig.DeployTargetPath);
+            }
+            else
+            {
+                // For IIS, a recycle is often more robust than stop/start
+                await ManageIisSiteAsync(service.IisSiteName, "recycle", log, service.Id);
+                await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id); // Ensure site is also started
+            }
+        }
+        else
+        {
+            if (isWin) await ManageWindowsServiceAsync(service.IisSiteName, action, log, service.Id, envConfig.DeployTargetPath);
+            else await ManageIisSiteAsync(service.IisSiteName, action, log, service.Id);
+        }
+
+        return true;
+    }
+
+
     public async Task<bool> DeployServiceAsync(
         ServiceDefinitionDB service,
         AppSettingsDB settings,
@@ -87,78 +185,34 @@ public class DeployLogic(
     {
         var serviceId = service.Id;
         var envConfig = service.Environments.FirstOrDefault(e => e.EnvironmentId == environmentId);
-
-        if (envConfig == null)
-        {
-            await log("ERROR", $"❌ Environment configuration not found for EnvironmentId: {environmentId} on service {service.Name}", serviceId);
-            return false;
-        }
+        if (envConfig == null) return false;
 
         var publishOutput = Path.Combine(Path.GetTempPath(), "net-deploy", service.Id ?? service.Name);
         var isWindowsService = service.ServiceType == "WindowsService";
 
-        if (skipBuildIfOutputExists && Directory.Exists(publishOutput) && Directory.GetFileSystemEntries(publishOutput).Any())
-        {
-            await log("INFO", "⏭️ [Skip] Build output already exists and skip requested. Proceeding directly to transfer...", serviceId);
-            return await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput);
-        }
+        // PHASE 1: PREPARATION (Pull, Build, Config)
+        bool prepSuccess = await PrepAndBuildServiceAsync(service, settings, log, environmentId, branchOverride, forceClean, skipPull, skipBuildIfOutputExists);
+        if (!prepSuccess) return false;
 
-        var (repoUrl, gitBranch, projectPath) = gitLogic.ParseGitUrl(service.RepoUrl);
-        var effectiveBranch = GetEffectiveBranch(service, envConfig, gitBranch, branchOverride);
-        var effectiveProjectPath = NormalizePath(GetEffectiveProjectPath(service, projectPath));
-
-        await log("INFO", $"▶ Starting deploy for: {service.Name}", serviceId);
-
-        if (!skipPull)
-        {
-            await log("INFO", $"📥 Pulling latest from Git ({repoUrl}, branch: {effectiveBranch})...", serviceId);
-            if (!await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean))
-            {
-                await log("ERROR", "❌ Git pull failed.", serviceId);
-                return false;
-            }
-            await log("SUCCESS", "✅ Git pull successful.", serviceId);
-        }
-
-        var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl, effectiveProjectPath);
-        var projectFullPath = Path.Combine(repoLocalPath, effectiveProjectPath);
-
-        if (Directory.Exists(publishOutput))
-        {
-            try
-            {
-                FileHelper.DeleteDirectoryRecursively(publishOutput);
-                await log("INFO", "🧹 Cleared old publish output folder.", serviceId);
-            }
-            catch (Exception ex)
-            {
-                await log("WARNING", $"Could not clear old publish folder: {ex.Message}");
-            }
-        }
-
+        // PHASE 2: STOP (Site/Service)
         if (isWindowsService)
             await ManageWindowsServiceAsync(service.IisSiteName, "stop", log, serviceId);
         else if (service.ServiceType is "WebApi" or "Mvc")
             await ManageIisSiteAsync(service.IisSiteName, "stop", log, serviceId);
 
-        await log("INFO", $"🔨 Building & publishing: {effectiveProjectPath}", serviceId);
+        // PHASE 3: TRANSFER & START
+        var success = await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput);
 
-        bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, serviceId);
-
-        if (!buildSuccess)
+        if (!success)
         {
+            // Restore service if transfer failed
             if (isWindowsService)
                 await ManageWindowsServiceAsync(service.IisSiteName, "start", log, serviceId, envConfig.DeployTargetPath);
             else if (service.ServiceType is "WebApi" or "Mvc")
                 await ManageIisSiteAsync(service.IisSiteName, "start", log, serviceId);
-
-            await log("ERROR", "❌ Build/publish failed.", serviceId);
-            return false;
         }
 
-        await log("SUCCESS", "✅ Build successful.", serviceId);
-
-        return await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput);
+        return success;
     }
 
     private async Task<bool> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfigDB envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput)
@@ -169,9 +223,6 @@ public class DeployLogic(
             await log("ERROR", "❌ Missing DeployTargetPath for service environment.", service.Id);
             return false;
         }
-
-        // Apply environment configurations (Variables + Renames + Auto-rename)
-        await ApplyEnvironmentConfigsAsync(envConfig, vpsOverride, publishOutput, log, service.Id);
 
         try
         {
@@ -272,14 +323,14 @@ public class DeployLogic(
                 await log("INFO", $"📦 Applying Config Set: {configSet.Name}", serviceId);
 
                 // 1. Determine target file for variables and handle optional rename
-                string targetFileForVariables = "appsettings.json"; 
+                string targetFileForVariables = "appsettings.json";
 
                 if (!string.IsNullOrWhiteSpace(configSet.SourceFileName))
                 {
                     var sourcePath = Path.Combine(publishOutput, configSet.SourceFileName);
                     var targetName = string.IsNullOrWhiteSpace(configSet.TargetFileName) ? configSet.SourceFileName : configSet.TargetFileName;
                     var targetPath = Path.Combine(publishOutput, targetName);
-                    
+
                     targetFileForVariables = targetName;
 
                     // Only copy/rename if target is different from source
@@ -334,8 +385,8 @@ public class DeployLogic(
 
             var parseOptions = new JsonDocumentOptions
             {
-               CommentHandling = JsonCommentHandling.Skip,
-               AllowTrailingCommas = true
+                CommentHandling = JsonCommentHandling.Skip,
+                AllowTrailingCommas = true
             };
 
             var jsonNode = JsonNode.Parse(jsonString, null, parseOptions);
@@ -388,15 +439,15 @@ public class DeployLogic(
                             // Treat as literal string
                             currentObj[lastKey] = JsonValue.Create(val);
                         }
-                        
+
                         applied++;
                     }
                 }
 
                 if (applied > 0)
                 {
-                    var options = new JsonSerializerOptions 
-                    { 
+                    var options = new JsonSerializerOptions
+                    {
                         WriteIndented = true,
                         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
                     };
@@ -417,7 +468,13 @@ public class DeployLogic(
         var actionIcon = action == "start" ? "🏁 Starting" : "🛑 Stopping";
         await log("INFO", $"{actionIcon} Windows Service: {iisSiteName}...", serviceId);
 
-        var success = await processRunner.RunAsync("sc.exe", $"{action} {iisSiteName}", ".", log, serviceId);
+        if (action == "start")
+        {
+            // Ensure service is set to Automatic and is enabled
+            await processRunner.RunAsync("sc.exe", $"config \"{iisSiteName}\" start= auto", ".", log, serviceId);
+        }
+
+        var success = await processRunner.RunAsync("sc.exe", $"{action} \"{iisSiteName}\"", ".", log, serviceId);
 
         if (action == "start" && !success && !string.IsNullOrWhiteSpace(targetPath))
         {
@@ -434,7 +491,7 @@ public class DeployLogic(
                     if (created)
                     {
                         await log("SUCCESS", $"✅ Service created. Starting...", serviceId);
-                        await processRunner.RunAsync("sc.exe", $"start {iisSiteName}", ".", log, serviceId);
+                        await processRunner.RunAsync("sc.exe", $"start \"{iisSiteName}\"", ".", log, serviceId);
                     }
                 }
             }
@@ -444,13 +501,21 @@ public class DeployLogic(
 
     private async Task ManageIisSiteAsync(string? iisSiteName, string action, LogCallback log, string? serviceId)
     {
-        var actionIcon = action == "start" ? "🏁 Starting" : "🛑 Stopping";
+        var actionIcon = action == "start" ? "🏁 Starting" : (action == "recycle" ? "♻️ Recycling" : "🛑 Stopping");
         await log("INFO", $"{actionIcon} IIS Site & AppPool: {iisSiteName}...", serviceId);
+
         var appcmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"inetsrv\appcmd.exe");
         if (!File.Exists(appcmd)) appcmd = "appcmd.exe";
 
-        await processRunner.RunAsync(appcmd, $"{action} site \"{iisSiteName}\"", ".", log, serviceId);
-        await processRunner.RunAsync(appcmd, $"{action} apppool \"{iisSiteName}\"", ".", log, serviceId);
+        if (action == "recycle")
+        {
+            await processRunner.RunAsync(appcmd, $"recycle apppool \"{iisSiteName}\"", ".", log, serviceId);
+        }
+        else
+        {
+            await processRunner.RunAsync(appcmd, $"{action} site \"{iisSiteName}\"", ".", log, serviceId);
+            await processRunner.RunAsync(appcmd, $"{action} apppool \"{iisSiteName}\"", ".", log, serviceId);
+        }
 
         if (action == "stop") await Task.Delay(3000);
     }

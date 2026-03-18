@@ -20,40 +20,61 @@
               <th class="ps-4">Name</th>
               <th>Type</th>
               <th>Last Deploy</th>
-              <th>Site/Service Name</th>
               <th>Status</th>
-              <th class="text-end pe-4">Actions</th>
+              <th class="text-end pe-4">
+                <div class="d-inline-flex align-items-center gap-2">
+                  <span class="smaller opacity-50">Target Env:</span>
+                  <select class="form-select form-select-sm bg-dark text-white border-secondary py-0" style="width: auto;" [(ngModel)]="targetEnvId">
+                    @for (env of environments(); track env.id) {
+                      <option [value]="env.id">{{env.name}}</option>
+                    }
+                  </select>
+                  <span class="ms-3">Actions</span>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
             @if (loading()) {
-              <tr><td colspan="6" class="text-center py-5">
+              <tr><td colspan="5" class="text-center py-5">
                 <div class="spinner-border spinner-border-sm text-primary me-2"></div>
                 Loading services...
               </td></tr>
             } @else if (services().length === 0) {
-              <tr><td colspan="6" class="text-center py-5 text-secondary">No services configured yet. Click "Add Service" to begin.</td></tr>
+              <tr><td colspan="5" class="text-center py-5 text-secondary">No services configured yet. Click "Add Service" to begin.</td></tr>
             }
             
             @for (s of services(); track s.id) {
-              <tr (click)="openEditModal(s)">
-                <td class="ps-4 fw-bold text-white">{{s.name}}</td>
+              <tr>
+                <td class="ps-4 fw-bold text-white" style="cursor: pointer;" (click)="openEditModal(s)">{{s.name}}</td>
                 <td><span class="badge bg-secondary opacity-75">{{s.serviceType}}</span></td>
                 <td>
                   <span class="text-secondary small" *ngIf="!s.lastDeployed">Never</span>
                   <span class="text-white-50 small" *ngIf="s.lastDeployed">{{s.lastDeployed | date:'dd/MM/yyyy HH:mm'}}</span>
                 </td>
-                <td><code class="text-info">{{s.iisSiteName}}</code></td>
                 <td>
-                  <span class="badge text-white" [ngClass]="{
+                  <div *ngIf="activeActionServiceId === s.id" class="d-flex align-items-center text-primary smaller">
+                    <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                    Processing...
+                  </div>
+                  <span *ngIf="activeActionServiceId !== s.id" class="badge text-white" [ngClass]="{
                     'bg-success': s.status === 'Running',
                     'bg-danger': s.status === 'Stopped',
                     'bg-warning': s.status === 'Unknown' || s.status === 'Error'
                   }">{{s.status || 'Unknown'}}</span>
                 </td>
                 <td class="text-end pe-4">
-                  <button class="btn btn-sm btn-outline-light border-0"><i class="bi bi-pencil-square"></i></button>
+                  <div class="btn-group btn-group-sm shadow-sm" *ngIf="targetEnvId">
+                    <button class="btn btn-outline-success border-secondary" title="Start" 
+                            (click)="runAction(s.id!, 'start')" [disabled]="activeActionServiceId"><i class="bi bi-play-fill"></i></button>
+                    <button class="btn btn-outline-danger border-secondary" title="Stop" 
+                            (click)="runAction(s.id!, 'stop')" [disabled]="activeActionServiceId"><i class="bi bi-stop-fill"></i></button>
+                    <button class="btn btn-outline-primary border-secondary" title="Restart / Recycle" 
+                            (click)="runAction(s.id!, 'restart')" [disabled]="activeActionServiceId"><i class="bi bi-arrow-clockwise"></i></button>
+                  </div>
+                  <button class="btn btn-sm btn-outline-light border-0 ms-2" (click)="openEditModal(s)" [disabled]="activeActionServiceId"><i class="bi bi-pencil-square"></i></button>
                 </td>
+
               </tr>
             }
           </tbody>

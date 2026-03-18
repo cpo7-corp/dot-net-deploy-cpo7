@@ -5,6 +5,7 @@ import { TranslateModule } from '@ngx-translate/core';
 import { ServicesMonitorService } from '../../services/services-monitor.service';
 import { SettingsService } from '../../services/settings.service';
 import { EnvConfigsService } from '../../services/env-configs.service';
+import { DeployService } from '../../services/deploy.service';
 import { ServiceStatus, ServiceDefinition, ServiceEnvironmentConfig, VpsSettings, EnvConfigSet } from '../../models/api-models';
 
 @Component({
@@ -18,13 +19,17 @@ export class ServicesComponent implements OnInit {
   private servicesSvc = inject(ServicesMonitorService);
   private settingsSvc = inject(SettingsService);
   private configSvc = inject(EnvConfigsService);
+  private deploySvc = inject(DeployService);
 
   services = signal<ServiceStatus[]>([]);
   loading = signal<boolean>(true);
   allConfigSets = signal<EnvConfigSet[]>([]);
   environments = signal<VpsSettings[]>([]);
 
+  targetEnvId: string | null = null;
+  activeActionServiceId: string | null = null;
   isModalOpen = false;
+
   isAddModalOpen = false;
   isConfigLookupOpen = false;
   configSearchQuery = '';
@@ -60,8 +65,38 @@ export class ServicesComponent implements OnInit {
   }
 
   loadEnvironments() {
-    this.settingsSvc.getSettings().subscribe(s => this.environments.set(s.vpsEnvironments || []));
+    this.settingsSvc.getSettings().subscribe(s => {
+      const envs = s.vpsEnvironments || [];
+      this.environments.set(envs);
+      if (envs.length > 0 && !this.targetEnvId) {
+        this.targetEnvId = envs[0].id || null;
+      }
+    });
   }
+
+  runAction(serviceId: string, action: string) {
+    if (!this.targetEnvId || this.activeActionServiceId) return;
+    this.activeActionServiceId = serviceId;
+
+    this.deploySvc.serviceAction(serviceId, this.targetEnvId, action).subscribe({
+      next: (log) => {
+        // We could show these in a console component if we wanted
+        console.log(`[Action: ${action}]`, log.message);
+      },
+      complete: () => {
+        // Refresh statuses after action completes
+        setTimeout(() => {
+          this.loadData();
+          this.activeActionServiceId = null;
+        }, 1200);
+      },
+      error: (err) => {
+        this.activeActionServiceId = null;
+        alert('Action failed: ' + err.message);
+      }
+    });
+  }
+
 
   allEnvironments(): VpsSettings[] {
     return this.environments();

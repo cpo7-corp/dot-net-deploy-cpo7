@@ -19,18 +19,22 @@ export class DeployService extends ApiService {
    * via Server-Sent Events (SSE).
    */
   deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null, forceClean: boolean = false, cloneAllFirst: boolean = false, skipBuildIfOutputExists: boolean = false): Observable<DeployLogEntry> {
+    return this.streamLogs(`${this.baseUrl}/deploy`, { services, environmentId, forceClean, cloneAllFirst, skipBuildIfOutputExists });
+  }
+
+  serviceAction(serviceId: string, environmentId: string, action: string): Observable<DeployLogEntry> {
+    return this.streamLogs(`${this.baseUrl}/deploy/service-action`, { serviceId, environmentId, action });
+  }
+
+  private streamLogs(url: string, body: any): Observable<DeployLogEntry> {
     const subject = new Subject<DeployLogEntry>();
 
-    // Since we must send a POST request with a body and then read the stream,
-    // standard EventSource does not support POST. We use fetch and read the ReadableStream.
-    fetch(`${this.baseUrl}/deploy`, {
+    fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ services, environmentId, forceClean, cloneAllFirst, skipBuildIfOutputExists })
+      body: JSON.stringify(body)
     }).then(async response => {
-      if (!response.body) {
-        throw new Error('No body returned from server.');
-      }
+      if (!response.body) throw new Error('No body returned from server.');
       
       const reader = response.body.getReader();
       const decoder = new TextDecoder('utf-8');
@@ -41,9 +45,7 @@ export class DeployService extends ApiService {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        
         const lines = buffer.split('\n\n');
-        // Keep the last incomplete block
         buffer = lines.pop() || '';
 
         for (const line of lines) {
@@ -53,9 +55,7 @@ export class DeployService extends ApiService {
               const entry = JSON.parse(dataStr) as DeployLogEntry;
               this.zone.run(() => {
                 subject.next(entry);
-                if (entry.level === 'DONE') {
-                  subject.complete();
-                }
+                if (entry.level === 'DONE') subject.complete();
               });
             }
           }
@@ -67,6 +67,7 @@ export class DeployService extends ApiService {
 
     return subject.asObservable();
   }
+
 
   getSessions(count = 10): Observable<string[]> {
     return this.http!.get<string[]>(`${this.baseUrl}/Deploy/sessions?count=${count}`);

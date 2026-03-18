@@ -54,7 +54,7 @@ public class BuildManager(ProcessRunner processRunner)
     private async Task<bool> RunDotnetPublishAsync(string projectPath, string outputPath, bool compileSingleFile, LogCallback log, string? serviceId)
     {
         var projectDir = Directory.Exists(projectPath) ? projectPath : Path.GetDirectoryName(projectPath)!;
-        var args = $"publish \"{projectPath}\" -c Release -o \"{outputPath}\" --nologo";
+        var args = $"publish \"{projectPath}\" -c Release -o \"{outputPath}\" --nologo -v minimal";
 
         if (compileSingleFile)
         {
