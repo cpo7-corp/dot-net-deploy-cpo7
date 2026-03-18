@@ -9,11 +9,12 @@ By downloading, installing, or using this software, you agree to the terms below
 - This software is **NOT FREE** for commercial or production use.
 - **FREE FOR LEARNING**: You are permitted to use this software for non-commercial learning or educational purposes only at no cost.
 
+- **License Fee**: **100 USDT per user / per year**.
+- The license is valid for **one year (12 months)** from the date of payment.
 - **Payment Method**: Cryptocurrency (USDT - Tether).
 - **Network**: **TRON Network (TRC20)** ONLY.
 - **Wallet Address**: `TECYZCJ1xkS4eVreNTfFttAEfVBZwDxqm3`
 - **Warning**: Do NOT send funds via ERC20 (Ethereum) or BEP20 (BSC). Doing so will result in permanent loss.
-- The license is valid for **one year (12 months)** from the date of payment.
 
 ## 2. GRANT OF LICENSE
 Subject to full payment, CPO7 grants you a limited, non-exclusive, non-transferable, revocable license to use the software for the duration of the paid subscription period.
