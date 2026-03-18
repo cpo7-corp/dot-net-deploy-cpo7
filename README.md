@@ -2,7 +2,7 @@
 
 **Automated Deployment & Management System for .NET Applications**
 
-NET Deploy is a powerful tool designed to automate the process of pulling, building, and deploying .NET services (WebAPI, MVC, Workers) and Node.js applications to remote VPS or local servers.
+NET Deploy is a powerful tool designed to automate the process of pulling, building, and deploying .NET services (WebAPI, MVC, Workers), Angular, and React applications to remote VPS or local servers.
 
 ![Image 1](1.png)
 ![Image 2](2.png)
@@ -14,6 +14,7 @@ NET Deploy is a powerful tool designed to automate the process of pulling, build
 ## Key Features
 - **Git Integration**: Pull and build from any Git repository.
 - **Multi-Service Deploy**: Deploy multiple services simultaneously.
+- **Framework Support**: Detailed support for .NET (WebAPI, Workers), Angular, React, and Node.js.
 - **IIS & Windows Services Support**: Automatic management of IIS sites and Windows Services.
 - **Live Terminal Logs**: Real-time feedback during the deployment process.
 - **Heartbeat Monitoring**: Automatic health checks after deployment.
