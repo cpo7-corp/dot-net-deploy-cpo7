@@ -1,28 +1,31 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
 import { ApiService } from './api.service';
 import { EnvConfigSet } from '../models/api-models';
-import { firstValueFrom } from 'rxjs';
 
-@Injectable({ providedIn: 'root' })
+@Injectable({
+  providedIn: 'root'
+})
 export class EnvConfigsService extends ApiService {
+  private endpoint = `${this.baseUrl}/env-configs`;
 
-  async getAll(): Promise<EnvConfigSet[]> {
-    return firstValueFrom(this.http.get<EnvConfigSet[]>(`${this.baseUrl}/EnvConfigs`));
+  getAll(): Observable<EnvConfigSet[]> {
+    return this.http.get<EnvConfigSet[]>(this.endpoint);
   }
 
-  async getById(id: string): Promise<EnvConfigSet> {
-    return firstValueFrom(this.http.get<EnvConfigSet>(`${this.baseUrl}/EnvConfigs/${id}`));
+  getById(id: string): Observable<EnvConfigSet> {
+    return this.http.get<EnvConfigSet>(`${this.endpoint}/${id}`);
   }
 
-  async create(configSet: EnvConfigSet): Promise<EnvConfigSet> {
-    return firstValueFrom(this.http.post<EnvConfigSet>(`${this.baseUrl}/EnvConfigs`, configSet));
+  create(data: EnvConfigSet): Observable<EnvConfigSet> {
+    return this.http.post<EnvConfigSet>(this.endpoint, data);
   }
 
-  async update(id: string, configSet: EnvConfigSet): Promise<EnvConfigSet> {
-    return firstValueFrom(this.http.put<EnvConfigSet>(`${this.baseUrl}/EnvConfigs/${id}`, configSet));
+  update(id: string, data: EnvConfigSet): Observable<EnvConfigSet> {
+    return this.http.put<EnvConfigSet>(`${this.endpoint}/${id}`, data);
   }
 
-  async delete(id: string): Promise<void> {
-    return firstValueFrom(this.http.delete<void>(`${this.baseUrl}/EnvConfigs/${id}`));
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.endpoint}/${id}`);
   }
 }

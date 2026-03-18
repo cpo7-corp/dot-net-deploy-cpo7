@@ -76,11 +76,13 @@ public class DeployController(
         // Helper to get or start a prep task for a specific service's repository
         Task<bool> EnsureRepoUpdated(ServiceDefinitionDB srv, string? branchOverride)
         {
-            var branchKey = branchOverride ?? srv.Branch;
+            var envCfg = srv.Environments.FirstOrDefault(e => e.EnvironmentId == vpsSettings.Id);
+            var defaultBranch = envCfg?.DefaultBranch ?? "main";
+            var branchKey = branchOverride ?? defaultBranch;
             var repoKey = $"{srv.RepoUrl}|{branchKey}";
 
             return repoPrepTasks.GetOrAdd(repoKey, _ => 
-                deployLogic.PrepGitOnlyAsync(srv, settings, Log, branchOverride, request.ForceClean)
+                deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean)
             );
         }
 
@@ -121,7 +123,7 @@ public class DeployController(
             }
 
             // Since we just ensured it's pulled, we tell DeployServiceAsync to skip its internal pull logic.
-            var success = await deployLogic.DeployServiceAsync(service, settings, Log, config.Branch, vpsSettings, request.ForceClean, skipPull: true, request.SkipBuildIfOutputExists);
+            var success = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, request.SkipBuildIfOutputExists);
 
             if (success)
                 await servicesLogic.MarkDeployedAsync(serviceId);

@@ -1,8 +1,8 @@
 using MongoDB.Driver;
 using NET.Deploy.Api.Data;
-using NET.Deploy.Api.Logic.EnvConfigs.Entities;
+using NET.Deploy.Api.Logic.Services.Entities;
 
-namespace NET.Deploy.Api.Logic.EnvConfigs;
+namespace NET.Deploy.Api.Logic.Services;
 
 public class EnvConfigsLogic(MongoDbContext db)
 {
@@ -12,15 +12,17 @@ public class EnvConfigsLogic(MongoDbContext db)
     public async Task<EnvConfigSetDB?> GetByIdAsync(string id) =>
         await db.EnvConfigSets.Find(Builders<EnvConfigSetDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id))).FirstOrDefaultAsync();
 
-    public async Task<EnvConfigSetDB> CreateAsync(EnvConfigSetDB configSet)
+    public async Task<EnvConfigSetDB> CreateAsync(EnvConfigSetDB config)
     {
-        configSet.Id = null; // MongoDB generates the ID
-        await db.EnvConfigSets.InsertOneAsync(configSet);
-        return configSet;
+        Prepare(config);
+        config.Id = null; 
+        await db.EnvConfigSets.InsertOneAsync(config);
+        return config;
     }
 
     public async Task<EnvConfigSetDB?> UpdateAsync(string id, EnvConfigSetDB updated)
     {
+        Prepare(updated);
         updated.Id = id;
         var result = await db.EnvConfigSets.ReplaceOneAsync(
             Builders<EnvConfigSetDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)),
@@ -29,18 +31,29 @@ public class EnvConfigsLogic(MongoDbContext db)
         return result.MatchedCount > 0 ? updated : null;
     }
 
+    private void Prepare(EnvConfigSetDB config)
+    {
+        config.Name = config.Name?.Trim() ?? string.Empty;
+        config.SourceFileName = config.SourceFileName?.Trim() ?? string.Empty;
+        config.TargetFileName = config.TargetFileName?.Trim() ?? string.Empty;
+        
+        if (config.Variables != null)
+        {
+            config.Variables = config.Variables
+                .Select(v => new EnvVariableDB { 
+                    Key = v.Key?.Trim() ?? string.Empty, 
+                    Value = v.Value?.Trim() ?? string.Empty 
+                })
+                .Where(v => !string.IsNullOrWhiteSpace(v.Key))
+                .ToList();
+        }
+    }
+
     public async Task<bool> DeleteAsync(string id)
     {
         var result = await db.EnvConfigSets.DeleteOneAsync(
             Builders<EnvConfigSetDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)));
 
         return result.DeletedCount > 0;
-    }
-
-    public async Task<List<EnvConfigSetDB>> GetByIdsAsync(IEnumerable<string> ids)
-    {
-        var objectIds = ids.Select(id => MongoDB.Bson.ObjectId.Parse(id)).ToList();
-        var filter = Builders<EnvConfigSetDB>.Filter.In("_id", objectIds);
-        return await db.EnvConfigSets.Find(filter).ToListAsync();
     }
 }

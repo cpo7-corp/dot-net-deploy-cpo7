@@ -5,7 +5,6 @@ using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.IIS;
 using NET.Deploy.Api.Logic.Services;
 using NET.Deploy.Api.Logic.Settings;
-using NET.Deploy.Api.Logic.EnvConfigs;
 using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);

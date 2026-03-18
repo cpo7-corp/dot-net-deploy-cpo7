@@ -14,6 +14,7 @@ public class ServicesLogic(MongoDbContext db)
 
     public async Task<ServiceDefinitionDB> CreateAsync(ServiceDefinitionDB service)
     {
+        Prepare(service);
         service.Id = null; // MongoDB generates the ID
         await db.Services.InsertOneAsync(service);
         return service;
@@ -21,12 +22,36 @@ public class ServicesLogic(MongoDbContext db)
 
     public async Task<ServiceDefinitionDB?> UpdateAsync(string id, ServiceDefinitionDB updated)
     {
+        Prepare(updated);
         updated.Id = id;
         var result = await db.Services.ReplaceOneAsync(
             Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)),
             updated);
 
         return result.MatchedCount > 0 ? updated : null;
+    }
+
+    private void Prepare(ServiceDefinitionDB service)
+    {
+        service.Name = service.Name?.Trim() ?? string.Empty;
+        service.RepoUrl = service.RepoUrl?.Trim() ?? string.Empty;
+        service.ProjectPath = service.ProjectPath?.Trim() ?? string.Empty;
+        service.IisSiteName = service.IisSiteName?.Trim() ?? string.Empty;
+        service.ServiceType = service.ServiceType?.Trim() ?? "WebApi";
+
+        if (service.Environments != null)
+        {
+            foreach (var env in service.Environments)
+            {
+                env.DeployTargetPath = env.DeployTargetPath?.Trim() ?? string.Empty;
+                env.HeartbeatUrl = env.HeartbeatUrl?.Trim() ?? string.Empty;
+                env.DefaultBranch = env.DefaultBranch?.Trim() ?? "main";
+                env.ConfigSetIds = env.ConfigSetIds?
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Select(id => id.Trim())
+                    .ToList() ?? new();
+            }
+        }
     }
 
     public async Task<bool> DeleteAsync(string id)

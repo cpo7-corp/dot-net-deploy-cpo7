@@ -14,9 +14,9 @@ export const routes: Routes = [
     path: 'logs', 
     loadComponent: () => import('./pages/logs/logs').then(c => c.LogsComponent) 
   },
-  { 
-    path: 'env-configs', 
-    loadComponent: () => import('./pages/env-configs/env-configs').then(c => c.EnvConfigsComponent) 
+  {
+    path: 'env-configs',
+    loadComponent: () => import('./pages/env-configs/env-configs').then(c => c.EnvConfigsComponent)
   },
   { 
     path: 'settings', 

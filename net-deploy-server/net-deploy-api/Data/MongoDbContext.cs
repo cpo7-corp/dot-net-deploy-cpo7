@@ -2,7 +2,6 @@ using MongoDB.Driver;
 using NET.Deploy.Api.Logic.DeployLogs.Entities;
 using NET.Deploy.Api.Logic.Services.Entities;
 using NET.Deploy.Api.Logic.Settings.Entities;
-using NET.Deploy.Api.Logic.EnvConfigs.Entities;
 
 namespace NET.Deploy.Api.Data;
 
@@ -29,11 +28,10 @@ public class MongoDbContext
     public IMongoCollection<ServiceDefinitionDB> Services =>
         _database.GetCollection<ServiceDefinitionDB>("services");
 
+    public IMongoCollection<EnvConfigSetDB> EnvConfigSets =>
+        _database.GetCollection<EnvConfigSetDB>("env_configs");
+
     /// <summary>Log lines written during deploy runs</summary>
     public IMongoCollection<DeployLogEntryDB> DeployLogs =>
         _database.GetCollection<DeployLogEntryDB>("deploy_logs");
-
-    /// <summary>Environment configuration sets (secrets, connection strings, etc.)</summary>
-    public IMongoCollection<EnvConfigSetDB> EnvConfigSets =>
-        _database.GetCollection<EnvConfigSetDB>("env_config_sets");
 }

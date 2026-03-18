@@ -22,11 +22,15 @@ public class GitSettings
 
 public class VpsSettings
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Id { get; set; } = Guid.CreateVersion7().ToString();
     public string Name { get; set; } = "Default";
     public string Host { get; set; } = string.Empty;
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public int Port { get; set; } = 22;
     public bool IsLocal { get; set; } = false;
+    public string EnvironmentTag { get; set; } = string.Empty;
+
+    public List<NET.Deploy.Api.Logic.Services.Entities.EnvVariableDB> SharedVariables { get; set; } = new();
+    public List<NET.Deploy.Api.Logic.Services.Entities.FileRenameDB> SharedFileRenames { get; set; } = new();
 }

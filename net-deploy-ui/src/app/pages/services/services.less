@@ -32,3 +32,36 @@
     box-shadow: 0 0 0 0.25rem rgba(var(--bs-primary-rgb), 0.25);
   }
 }
+
+// Side-tabs in modal
+.nav-pills {
+  .nav-link {
+    color: rgba(255, 255, 255, 0.7);
+    border-radius: 0;
+    font-size: 0.9rem;
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: #fff;
+    }
+    &.active {
+      background: rgba(var(--bs-primary-rgb), 0.2) !important;
+      color: var(--bs-primary) !important;
+      border-right: 2px solid var(--bs-primary) !important;
+    }
+  }
+}
+
+.bg-dark-subtle {
+  background: #232323 !important;
+}
+
+.smaller {
+  font-size: 0.75rem;
+}
+
+.list-group-item-action {
+  &:hover {
+    background: rgba(255, 255, 255, 0.03) !important;
+  }
+}
+

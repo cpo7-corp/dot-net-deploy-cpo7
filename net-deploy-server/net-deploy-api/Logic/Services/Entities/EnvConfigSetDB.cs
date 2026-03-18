@@ -1,7 +1,7 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace NET.Deploy.Api.Logic.EnvConfigs.Entities;
+namespace NET.Deploy.Api.Logic.Services.Entities;
 
 [BsonIgnoreExtraElements]
 public class EnvConfigSetDB
@@ -12,22 +12,22 @@ public class EnvConfigSetDB
 
     public string Name { get; set; } = string.Empty;
 
-    public string EnvironmentId { get; set; } = string.Empty;
+    public string SourceFileName { get; set; } = string.Empty;
 
-    public string TargetFileName { get; set; } = "appsettings.json";
+    public string TargetFileName { get; set; } = string.Empty;
 
-    public List<EnvVariable> Variables { get; set; } = new();
-
-    public List<FileRename> FileRenames { get; set; } = new();
+    public List<EnvVariableDB> Variables { get; set; } = new();
 }
 
-public class EnvVariable
+[BsonIgnoreExtraElements]
+public class EnvVariableDB
 {
     public string Key { get; set; } = string.Empty;
     public string Value { get; set; } = string.Empty;
 }
 
-public class FileRename
+[BsonIgnoreExtraElements]
+public class FileRenameDB
 {
     public string SourceFileName { get; set; } = string.Empty;
     public string TargetFileName { get; set; } = string.Empty;

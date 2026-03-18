@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
 import { EnvConfigsService } from '../../services/env-configs.service';
-import { EnvConfigSet, EnvVariable } from '../../models/api-models';
+import { EnvConfigSet } from '../../models/api-models';
 
 @Component({
   selector: 'app-env-configs',
@@ -13,61 +13,38 @@ import { EnvConfigSet, EnvVariable } from '../../models/api-models';
   styleUrl: './env-configs.less'
 })
 export class EnvConfigsComponent implements OnInit {
-  private envConfigsSvc = inject(EnvConfigsService);
+  private configSvc = inject(EnvConfigsService);
 
   configs = signal<EnvConfigSet[]>([]);
   loading = signal<boolean>(true);
-  
-  newConfig: EnvConfigSet = this.resetNewConfig();
-  selectedConfig: EnvConfigSet | null = null;
-  
+
   isModalOpen = false;
-  isAddModalOpen = false;
+  selectedConfig: EnvConfigSet | null = null;
+  newConfig: Partial<EnvConfigSet> = this.resetNewConfig();
 
   ngOnInit() {
-    this.loadData();
+    this.loadConfigs();
   }
 
-  loadData() {
+  loadConfigs() {
     this.loading.set(true);
-    this.envConfigsSvc.getAll().then(data => {
-      this.configs.set(data);
-      this.loading.set(false);
-    }).catch(err => {
-      console.error('Error fetching env configs:', err);
-      this.loading.set(false);
+    this.configSvc.getAll().subscribe({
+      next: (data) => {
+        this.configs.set(data);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false)
     });
   }
 
   openAddModal() {
+    this.selectedConfig = null;
     this.newConfig = this.resetNewConfig();
-    this.isAddModalOpen = true;
-  }
-
-  closeAddModal() {
-    this.isAddModalOpen = false;
-  }
-
-  addVariable(config: EnvConfigSet) {
-    config.variables.push({ key: '', value: '' });
-  }
-
-  removeVariable(config: EnvConfigSet, index: number) {
-    config.variables.splice(index, 1);
-  }
-
-  saveNewConfig() {
-    if (!this.newConfig.name || !this.newConfig.environmentId) return;
-
-    this.envConfigsSvc.create(this.newConfig).then(() => {
-      this.closeAddModal();
-      this.loadData();
-    });
+    this.isModalOpen = true;
   }
 
   openEditModal(config: EnvConfigSet) {
     this.selectedConfig = JSON.parse(JSON.stringify(config));
-    if (!this.selectedConfig?.variables) this.selectedConfig!.variables = [];
     this.isModalOpen = true;
   }
 
@@ -76,32 +53,52 @@ export class EnvConfigsComponent implements OnInit {
     this.selectedConfig = null;
   }
 
-  updateConfig() {
-    if (!this.selectedConfig || !this.selectedConfig.id) return;
-    this.envConfigsSvc.update(this.selectedConfig.id, this.selectedConfig).then(() => {
-      this.closeModal();
-      this.loadData();
-    });
+  saveConfig() {
+    const config = this.selectedConfig || (this.newConfig as EnvConfigSet);
+    
+    // Trim descriptive fields with null-safety
+    config.name = config.name?.trim() ?? '';
+    config.sourceFileName = config.sourceFileName?.trim() ?? '';
+    config.targetFileName = config.targetFileName?.trim() ?? '';
+
+    // Trim variables with null-safety
+    if (config.variables) {
+      config.variables = config.variables.map(v => ({
+        key: v.key?.trim() ?? '',
+        value: v.value?.trim() ?? ''
+      })).filter(v => !!v.key); // Only filter if key is not empty
+    }
+
+    if (this.selectedConfig) {
+      this.configSvc.update(this.selectedConfig.id!, config).subscribe(() => {
+        this.loadConfigs();
+        this.closeModal();
+      });
+    } else {
+      this.configSvc.create(config).subscribe(() => {
+        this.loadConfigs();
+        this.closeModal();
+      });
+    }
   }
 
   deleteConfig(id: string) {
-    if (!confirm('Are you sure you want to delete this configuration set?')) return;
-    this.envConfigsSvc.delete(id).then(() => {
-      this.closeModal();
-      this.loadData();
-    });
+    if (!confirm('Are you sure?')) return;
+    this.configSvc.delete(id).subscribe(() => this.loadConfigs());
   }
 
-  addFileRename(config: EnvConfigSet) {
-    if (!config.fileRenames) config.fileRenames = [];
-    config.fileRenames.push({ sourceFileName: '', targetFileName: '' });
+  addVariable() {
+    const config = this.selectedConfig || this.newConfig;
+    if (!config.variables) config.variables = [];
+    config.variables.push({ key: '', value: '' });
   }
 
-  removeFileRename(config: EnvConfigSet, index: number) {
-    config.fileRenames.splice(index, 1);
+  removeVariable(index: number) {
+    const config = this.selectedConfig || this.newConfig;
+    config.variables?.splice(index, 1);
   }
 
-  private resetNewConfig(): EnvConfigSet {
-    return { name: '', environmentId: '', targetFileName: 'appsettings.json', variables: [], fileRenames: [] };
+  private resetNewConfig(): Partial<EnvConfigSet> {
+    return { name: '', sourceFileName: '', targetFileName: '', variables: [] };
   }
 }

@@ -1,39 +1,35 @@
 using Microsoft.AspNetCore.Mvc;
-using NET.Deploy.Api.Logic.EnvConfigs;
-using NET.Deploy.Api.Logic.EnvConfigs.Entities;
+using NET.Deploy.Api.Logic.Services;
+using NET.Deploy.Api.Logic.Services.Entities;
 
 namespace NET.Deploy.Api.Controllers;
 
 [ApiController]
-[Route("api/[controller]")]
-public class EnvConfigsController(EnvConfigsLogic logic, ILogger<EnvConfigsController> logger) : ControllerBase
+[Route("api/env-configs")]
+public class EnvConfigsController(EnvConfigsLogic logic) : ControllerBase
 {
     [HttpGet]
-    public async Task<ActionResult<List<EnvConfigSetDB>>> GetAll()
-    {
-        var configs = await logic.GetAllAsync();
-        return Ok(configs);
-    }
+    public async Task<ActionResult<List<EnvConfigSetDB>>> GetAll() =>
+        Ok(await logic.GetAllAsync());
 
     [HttpGet("{id}")]
     public async Task<ActionResult<EnvConfigSetDB>> GetById(string id)
     {
-        var config = await logic.GetByIdAsync(id);
-        return config is null ? NotFound() : Ok(config);
+        var result = await logic.GetByIdAsync(id);
+        return result is null ? NotFound() : Ok(result);
     }
 
     [HttpPost]
-    public async Task<ActionResult<EnvConfigSetDB>> Create([FromBody] EnvConfigSetDB envConfigSet)
+    public async Task<ActionResult<EnvConfigSetDB>> Create([FromBody] EnvConfigSetDB config)
     {
-        logger.LogInformation("Creating config set: {Name}", envConfigSet.Name);
-        var created = await logic.CreateAsync(envConfigSet);
+        var created = await logic.CreateAsync(config);
         return Ok(created);
     }
 
     [HttpPut("{id}")]
-    public async Task<ActionResult<EnvConfigSetDB>> Update(string id, [FromBody] EnvConfigSetDB envConfigSet)
+    public async Task<ActionResult<EnvConfigSetDB>> Update(string id, [FromBody] EnvConfigSetDB config)
     {
-        var updated = await logic.UpdateAsync(id, envConfigSet);
+        var updated = await logic.UpdateAsync(id, config);
         return updated is null ? NotFound() : Ok(updated);
     }
 

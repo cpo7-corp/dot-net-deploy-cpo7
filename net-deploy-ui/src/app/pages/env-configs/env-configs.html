@@ -1,200 +1,112 @@
-<div class="h-100 d-flex flex-column gap-4 animate__animated animate__fadeIn">
-  <!-- Header -->
-  <div class="d-flex justify-content-between align-items-end">
-    <div>
-      <h1 class="h3 page-title mb-1">Environment Configs</h1>
-      <p class="text-secondary small mb-0">Manage configuration variables per environment (e.g. Connection Strings)</p>
-    </div>
-    <button class="btn btn-primary d-flex align-items-center gap-2 shadow" (click)="openAddModal()">
-      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      Add Config Set
+<div class="container-fluid">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h1 class="page-title mb-0">Variables</h1>
+    <button class="btn btn-primary px-4 shadow-sm" (click)="openAddModal()">
+      <i class="bi bi-plus-lg me-2"></i> Add Variables
     </button>
   </div>
 
-  <!-- Loading State -->
-  <div *ngIf="loading()" class="d-flex justify-content-center align-items-center py-5">
-    <div class="spinner-border text-primary" role="status">
-      <span class="visually-hidden">Loading...</span>
-    </div>
-  </div>
-
-  <!-- Table -->
-  <div *ngIf="!loading()" class="card bg-dark border-secondary shadow-sm overflow-hidden text-white flex-grow-1">
-    <div class="table-responsive h-100">
-      <table class="table table-dark table-hover mb-0 clickable-table">
-        <thead class="table-dark text-uppercase small text-secondary position-sticky top-0 shadow-sm" style="z-index: 1;">
-          <tr>
-            <th class="bg-dark fw-semibold py-3 border-secondary">Set Name</th>
-            <th class="bg-dark fw-semibold py-3 border-secondary">Environment</th>
-            <th class="bg-dark fw-semibold py-3 border-secondary">Target File</th>
-            <th class="bg-dark fw-semibold py-3 border-secondary">Variables #</th>
-            <th class="bg-dark fw-semibold py-3 border-secondary text-end">Actions</th>
+  <div class="card bg-dark text-white border-secondary glass-panel shadow-sm">
+    <div class="table-responsive">
+      <table class="table table-dark table-hover mb-0 align-middle">
+        <thead>
+          <tr class="text-secondary small text-uppercase">
+            <th class="ps-4">Name</th>
+            <th>Source File</th>
+            <th>File to Rename</th>
+            <th>Variables</th>
+            <th class="text-end pe-4">Actions</th>
           </tr>
         </thead>
-        <tbody class="border-top-0">
-          <tr *ngIf="configs().length === 0">
-            <td colspan="5" class="text-center py-5 text-secondary">
-              No configuration sets found. Create one.
-            </td>
-          </tr>
-          <tr *ngFor="let config of configs()" (click)="openEditModal(config)">
-            <td class="align-middle fw-medium">
-              {{ config.name }}
-            </td>
-            <td class="align-middle text-info">
-              {{ config.environmentId }}
-            </td>
-            <td class="align-middle text-secondary font-monospace">
-              {{ config.targetFileName }}
-            </td>
-            <td class="align-middle">
-              <span class="badge bg-secondary">{{ config.variables ? config.variables.length : 0 }}</span>
-            </td>
-            <td class="align-middle text-end" (click)="$event.stopPropagation()">
-              <div class="dropdown">
-                <button class="btn btn-sm btn-link text-secondary p-0" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-three-dots-vertical" viewBox="0 0 16 16">
-                    <path d="M9.5 13a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0zm0-5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z"/>
-                  </svg>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-dark dropdown-menu-end shadow">
-                  <li><a class="dropdown-item" href="javascript:void(0)" (click)="openEditModal(config)">Edit Set</a></li>
-                  <li><hr class="dropdown-divider border-secondary"></li>
-                  <li><a class="dropdown-item text-danger" href="javascript:void(0)" (click)="deleteConfig(config.id!)">Delete</a></li>
-                </ul>
-              </div>
-            </td>
-          </tr>
+        <tbody>
+          @if (loading()) {
+            <tr><td colspan="4" class="text-center py-5 text-info">Loading...</td></tr>
+          } @else if (configs().length === 0) {
+            <tr><td colspan="4" class="text-center py-5 text-secondary fst-italic">No configurations created yet.</td></tr>
+          }
+          
+          @for (cfg of configs(); track cfg.id) {
+            <tr>
+              <td class="ps-4 fw-bold text-info">{{cfg.name}}</td>
+              <td><span class="text-white-50 small">{{cfg.sourceFileName || 'N/A'}}</span></td>
+              <td><code class="text-white-50" *ngIf="cfg.targetFileName">{{cfg.targetFileName}}</code><span class="text-secondary small" *ngIf="!cfg.targetFileName">None</span></td>
+              <td><span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25">{{cfg.variables.length}} overrides</span></td>
+              <td class="text-end pe-4">
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-outline-light border-0" (click)="openEditModal(cfg)"><i class="bi bi-pencil-fill"></i></button>
+                  <button class="btn btn-sm btn-outline-danger border-0" (click)="deleteConfig(cfg.id!)"><i class="bi bi-trash-fill"></i></button>
+                </div>
+              </td>
+            </tr>
+          }
         </tbody>
       </table>
     </div>
   </div>
-</div>
 
-<!-- Add Config Set Modal -->
-<div class="modal fade" [class.show]="isAddModalOpen" [style.display]="isAddModalOpen ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
-    <div class="modal-content shadow-lg border-secondary text-white bg-dark">
-      <div class="modal-header border-secondary">
-        <h5 class="modal-title h5 fw-bold">Add Configuration Set</h5>
-        <button type="button" class="btn-close btn-close-white" (click)="closeAddModal()"></button>
-      </div>
-      <div class="modal-body">
-        <div class="row g-3">
-          <div class="col-md-6">
-            <label class="form-label small text-secondary">Set Name</label>
-            <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newConfig.name" placeholder="e.g. DB Production">
-          </div>
-          <div class="col-md-6">
-            <label class="form-label small text-secondary">Environment Name/ID</label>
-            <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newConfig.environmentId" placeholder="e.g. Prod, Stage, Test">
-          </div>
-          <div class="col-12">
-            <label class="form-label small text-secondary">Target File</label>
-            <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newConfig.targetFileName" placeholder="e.g. appsettings.json">
-            <div class="form-text text-secondary">The json configuration file modified inside the deployment target.</div>
-          </div>
+  <!-- Modal -->
+  <div class="modal d-block" *ngIf="isModalOpen" tabindex="-1">
+    <div class="modal-backdrop fade show" style="position: fixed; inset: 0;" (click)="closeModal()"></div>
+    <div class="modal-dialog modal-lg modal-dialog-centered" style="position: relative; z-index: 1060;">
+      <div class="modal-content bg-dark text-white border-secondary glass-panel shadow-lg">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title"><i class="bi bi-braces-asterisk me-2 text-warning"></i>{{ selectedConfig ? 'Edit' : 'Create' }} Variables</h5>
+          <button type="button" class="btn-close btn-close-white" (click)="closeModal()"></button>
         </div>
-      </div>
-      <div class="modal-footer border-secondary mt-2">
-        <button type="button" class="btn btn-outline-secondary" (click)="closeAddModal()">Cancel</button>
-        <button type="button" class="btn btn-primary px-4" (click)="saveNewConfig()" [disabled]="!newConfig.name || !newConfig.environmentId">Create Set</button>
-      </div>
-    </div>
-  </div>
-</div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label text-secondary small text-uppercase">Descriptive Name (ID)</label>
+              <input type="text" class="form-control bg-dark text-white border-secondary" 
+                     [(ngModel)]="(selectedConfig || newConfig).name" placeholder="e.g. Identity-Production-Core">
+            </div>
 
-<!-- Edit Config Set Modal / Variables Manager -->
-<div class="modal fade" [class.show]="isModalOpen" [style.display]="isModalOpen ? 'block' : 'none'" tabindex="-1" style="background: rgba(0,0,0,0.5); backdrop-filter: blur(5px);">
-  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable">
-    <div class="modal-content shadow-lg border-secondary text-white bg-dark" *ngIf="selectedConfig">
-      <div class="modal-header border-secondary">
-        <h5 class="modal-title h5 fw-bold d-flex align-items-center gap-2">
-          <span>{{ selectedConfig.name }}</span>
-          <span class="badge bg-info text-dark fs-6">{{ selectedConfig.environmentId }}</span>
-        </h5>
-        <button type="button" class="btn-close btn-close-white" (click)="closeModal()"></button>
-      </div>
-      <div class="modal-body">
-        
-        <div class="row g-3 mb-4">
-          <div class="col-md-4">
-            <label class="form-label small text-secondary">Set Name</label>
-            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="selectedConfig.name">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small text-secondary">Environment</label>
-            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="selectedConfig.environmentId">
-          </div>
-          <div class="col-md-4">
-            <label class="form-label small text-secondary">Target File</label>
-            <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="selectedConfig.targetFileName">
-          </div>
-        </div>
+            <div class="col-md-6">
+              <label class="form-label text-secondary small text-uppercase">Source File Name</label>
+              <input type="text" class="form-control bg-dark text-white border-secondary" 
+                     [(ngModel)]="(selectedConfig || newConfig).sourceFileName" placeholder="e.g. appsettings.prod.json">
+            </div>
 
-        <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
-          <h6 class="mb-0 text-white-50">File Overwrites / Transformations (Copy Source to Target)</h6>
-          <button class="btn btn-sm btn-outline-warning" (click)="addFileRename(selectedConfig)">+ Add Overwrite</button>
-        </div>
+            <div class="col-md-6">
+              <label class="form-label text-secondary small text-uppercase">Target File to Rename</label>
+              <input type="text" class="form-control bg-dark text-white border-secondary" 
+                     [(ngModel)]="(selectedConfig || newConfig).targetFileName" placeholder="e.g. appsettings.json">
+            </div>
 
-        <div class="card bg-black border-secondary mb-4">
-          <ul class="list-group list-group-flush" *ngIf="selectedConfig.fileRenames && selectedConfig.fileRenames.length > 0">
-            <li class="list-group-item bg-transparent border-secondary text-white py-3" *ngFor="let r of selectedConfig.fileRenames; let i = index">
-              <div class="row g-2 align-items-center">
-                <div class="col-md-5">
-                  <label class="small text-secondary d-block">Source (Original)</label>
-                  <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="r.sourceFileName" placeholder="e.g. shared-settings.prod.json">
-                </div>
-                <div class="col-md-1 text-center pt-3 text-secondary">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-right" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/>
-                  </svg>
-                </div>
-                <div class="col-md-5">
-                  <label class="small text-secondary d-block">Target (Renamed To)</label>
-                  <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="r.targetFileName" placeholder="e.g. shared-settings.json">
-                </div>
-                <div class="col-md-1 text-end pt-3">
-                  <button class="btn btn-sm btn-outline-danger border-0" (click)="removeFileRename(selectedConfig, i)">×</button>
-                </div>
+            <div class="col-12 mt-4">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <h6 class="text-info mb-0">Variables</h6>
+                <button type="button" class="btn btn-sm btn-outline-info" (click)="addVariable()">
+                  <i class="bi bi-plus-lg"></i> Add Variable
+                </button>
               </div>
-            </li>
-          </ul>
-          <div class="p-4 text-center text-secondary small" *ngIf="!selectedConfig.fileRenames || selectedConfig.fileRenames.length === 0">
-            No file transformations for this set.
-          </div>
-        </div>
-
-        <div class="d-flex justify-content-between align-items-center mb-2 mt-4">
-          <h6 class="mb-0 text-white-50">Variables/Keys to override (JSON)</h6>
-          <button class="btn btn-sm btn-outline-info" (click)="addVariable(selectedConfig)">+ Add Variable</button>
-        </div>
-
-        <div class="card bg-black border-secondary">
-          <ul class="list-group list-group-flush" *ngIf="selectedConfig.variables && selectedConfig.variables.length > 0">
-            <li class="list-group-item bg-transparent border-secondary text-white py-3" *ngFor="let v of selectedConfig.variables; let i = index">
-              <div class="row g-2 align-items-center">
-                <div class="col-md-4">
-                  <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary var-key" [(ngModel)]="v.key" placeholder="e.g. ConnectionStrings.DefaultConnection">
-                </div>
-                <div class="col-md-7">
-                  <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary text-success" [(ngModel)]="v.value" placeholder="Value...">
-                </div>
-                <div class="col-md-1 text-end">
-                  <button class="btn btn-sm btn-outline-danger border-0" (click)="removeVariable(selectedConfig, i)" title="Remove Variable">×</button>
-                </div>
+              <div class="border border-secondary border-opacity-25 rounded p-3 bg-black bg-opacity-25">
+                 @for (v of (selectedConfig || newConfig).variables; track $index) {
+                   <div class="row g-2 mb-2">
+                     <div class="col-md-5">
+                       <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary font-monospace" [(ngModel)]="v.key" placeholder="Key (e.g. Jwt:Key)">
+                     </div>
+                     <div class="col-md-6">
+                       <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="v.value" placeholder="Value">
+                     </div>
+                     <div class="col-md-1 text-end">
+                       <button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="removeVariable($index)"><i class="bi bi-x-circle-fill"></i></button>
+                     </div>
+                   </div>
+                 }
+                 @if (!(selectedConfig || newConfig).variables?.length) {
+                   <div class="text-secondary small fst-italic">No variables defined yet.</div>
+                 }
               </div>
-            </li>
-          </ul>
-          <div class="p-4 text-center text-secondary small" *ngIf="!selectedConfig.variables || selectedConfig.variables.length === 0">
-            No variables added yet. Add a variable to start overriding json keys.
+            </div>
           </div>
         </div>
-      </div>
-      <div class="modal-footer border-secondary">
-        <button type="button" class="btn btn-danger me-auto" (click)="deleteConfig(selectedConfig.id!)">Delete Set</button>
-        <button type="button" class="btn btn-outline-secondary" (click)="closeModal()">Cancel</button>
-        <button type="button" class="btn btn-primary px-4" (click)="updateConfig()">Save Changes</button>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-outline-secondary px-4" (click)="closeModal()">Cancel</button>
+          <button type="button" class="btn btn-primary px-5 shadow-sm" (click)="saveConfig()" [disabled]="!(selectedConfig || newConfig).name">
+            Save Variables
+          </button>
+        </div>
       </div>
     </div>
   </div>

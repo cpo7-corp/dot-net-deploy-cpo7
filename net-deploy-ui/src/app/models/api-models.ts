@@ -10,13 +10,24 @@ export interface GitSettings {
 }
 
 export interface VpsSettings {
-  id?: string;
+  id: string;
   name: string;
   host: string;
   username: string;
   password?: string;
   port: number;
   isLocal: boolean;
+  environmentTag: string;
+  sharedVariables?: EnvVariable[];
+  sharedFileRenames?: FileRename[];
+}
+
+export interface EnvConfigSet {
+  id?: string;
+  name: string;
+  sourceFileName: string;
+  targetFileName: string;
+  variables: EnvVariable[];
 }
 
 export interface ServiceDefinition {
@@ -26,13 +37,18 @@ export interface ServiceDefinition {
   projectPath: string;
   iisSiteName: string;
   serviceType: 'WebApi' | 'Mvc' | 'WindowsService' | 'Angular' | 'React';
-  branch: string;
   compileSingleFile: boolean;
-  heartbeatUrl: string;
-  deployTargetPath: string;
   lastDeployed?: string | Date;
-  envConfigSetIds?: string[];
+  environments: ServiceEnvironmentConfig[];
   _saved?: boolean; // UI state only
+}
+
+export interface ServiceEnvironmentConfig {
+  environmentId: string;
+  deployTargetPath: string;
+  heartbeatUrl: string;
+  defaultBranch: string;
+  configSetIds: string[];
 }
 
 export interface EnvVariable {
@@ -43,15 +59,6 @@ export interface EnvVariable {
 export interface FileRename {
   sourceFileName: string;
   targetFileName: string;
-}
-
-export interface EnvConfigSet {
-  id?: string;
-  name: string;
-  environmentId: string;
-  targetFileName: string;
-  variables: EnvVariable[];
-  fileRenames: FileRename[];
 }
 
 export interface ServiceStatus extends ServiceDefinition {

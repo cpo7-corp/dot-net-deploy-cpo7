@@ -28,12 +28,10 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
                 ServiceType = s.ServiceType,
                 IisSiteName = s.IisSiteName,
                 RepoUrl = s.RepoUrl,
-                Branch = s.Branch,
-                DeployTargetPath = s.DeployTargetPath,
                 ProjectPath = s.ProjectPath,
                 LastDeployed = s.LastDeployed,
                 CompileSingleFile = s.CompileSingleFile,
-                HeartbeatUrl = s.HeartbeatUrl,
+                Environments = s.Environments,
                 Status = status
             };
         }));

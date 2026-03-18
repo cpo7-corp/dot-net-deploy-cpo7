@@ -19,16 +19,24 @@ public class ServiceDefinitionDB
 
     public string IisSiteName { get; set; } = string.Empty;
 
-    /// <summary>WebApi | Mvc | Worker</summary>
+    /// <summary>WebApi | Mvc | Worker | Angular | React</summary>
     public string ServiceType { get; set; } = "WebApi";
 
-    /// <summary>Absolute path on the VPS where built output is deployed</summary>
-    public string DeployTargetPath { get; set; } = string.Empty;
-
-    public string Branch { get; set; } = "main";
     public bool CompileSingleFile { get; set; } = false;
 
-    public List<string> EnvConfigSetIds { get; set; } = new();
-    public string HeartbeatUrl { get; set; } = string.Empty;
+    public List<ServiceEnvironmentConfigDB> Environments { get; set; } = new();
+
     public DateTime? LastDeployed { get; set; }
+}
+
+[BsonIgnoreExtraElements]
+public class ServiceEnvironmentConfigDB
+{
+    public string EnvironmentId { get; set; } = string.Empty;
+    public string DeployTargetPath { get; set; } = string.Empty;
+    public string HeartbeatUrl { get; set; } = string.Empty;
+    public string DefaultBranch { get; set; } = "main";
+    
+    /// <summary>IDs of EnvConfigSetDB to apply</summary>
+    public List<string> ConfigSetIds { get; set; } = new();
 }

@@ -50,9 +50,13 @@
               <i class="bi bi-trash-fill fs-5"></i>
             </button>
             <div class="row g-3">
-              <div class="col-md-8">
+              <div class="col-md-5">
                 <label class="form-label">Environment Name</label>
                 <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.name" [name]="'v_name_' + $index" placeholder="e.g. Production" required>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label text-warning small text-uppercase">Auto-Rename Tag</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary border-warning border-opacity-50" [(ngModel)]="vps.environmentTag" [name]="'v_tag_' + $index" placeholder="e.g. prod">
               </div>
               <div class="col-md-4 d-flex align-items-end">
                 <div class="form-check form-switch mb-2">
@@ -85,6 +89,63 @@
                   </div>
                 </div>
               }
+
+              <!-- Shared Variables Section -->
+              <div class="col-12 mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h5 class="text-warning mb-0"><i class="bi bi-braces me-2"></i> Shared Variables (appsettings.json)</h5>
+                  <button type="button" class="btn btn-sm btn-outline-warning" (click)="addSharedVariable(vps)">
+                    <i class="bi bi-plus-lg"></i> Add Shared Variable
+                  </button>
+                </div>
+                <div class="border border-secondary border-opacity-25 rounded p-3 bg-black bg-opacity-25">
+                  @for (v of vps.sharedVariables; track $index) {
+                    <div class="row g-2 mb-2 align-items-center">
+                      <div class="col-md-5">
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="v.key" [name]="'sv_key_'+$index+'_'+vps.id" placeholder="Key (e.g. DbConnection)">
+                      </div>
+                      <div class="col-md-6">
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="v.value" [name]="'sv_val_'+$index+'_'+vps.id" placeholder="Value">
+                      </div>
+                      <div class="col-md-1 text-end">
+                        <button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="removeSharedVariable(vps, $index)"><i class="bi bi-x-circle-fill"></i></button>
+                      </div>
+                    </div>
+                  }
+                  @if (!vps.sharedVariables?.length) {
+                    <div class="text-secondary small fst-italic">No shared variables defined. These apply to ALL services in this environment.</div>
+                  }
+                </div>
+              </div>
+
+              <!-- Shared File Renames Section -->
+              <div class="col-12 mt-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                  <h5 class="text-info mb-0"><i class="bi bi-files me-2"></i> Shared File Overwrites (e.g. shared-settings.json)</h5>
+                  <button type="button" class="btn btn-sm btn-outline-info" (click)="addSharedFileRename(vps)">
+                    <i class="bi bi-plus-lg"></i> Add Shared Overwrite
+                  </button>
+                </div>
+                <div class="border border-secondary border-opacity-25 rounded p-3 bg-black bg-opacity-25">
+                  @for (r of vps.sharedFileRenames; track $index) {
+                    <div class="row g-2 mb-2 align-items-center">
+                      <div class="col-md-5">
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="r.sourceFileName" [name]="'sr_src_'+$index+'_'+vps.id" placeholder="Source (e.g. shared-settings.json)">
+                      </div>
+                      <div class="col-md-6">
+                        <input type="text" class="form-control form-control-sm bg-dark text-white border-secondary" [(ngModel)]="r.targetFileName" [name]="'sr_trg_'+$index+'_'+vps.id" placeholder="Target (e.g. settings.json)">
+                      </div>
+                      <div class="col-md-1 text-end">
+                        <button type="button" class="btn btn-sm btn-link text-danger p-0" (click)="removeSharedFileRename(vps, $index)"><i class="bi bi-x-circle-fill"></i></button>
+                      </div>
+                    </div>
+                  }
+                  @if (!vps.sharedFileRenames?.length) {
+                    <div class="text-secondary small fst-italic">No shared file overwrites defined. For example, copy a shared config file to all services.</div>
+                  }
+                </div>
+              </div>
+
             </div>
           </div>
         }

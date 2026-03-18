@@ -42,7 +42,12 @@ export class DeployComponent implements OnInit {
         this.services.set(sorted);
         // Initialize default branch for each service
         data.forEach(s => {
-          if (s.id) this.serviceBranches[s.id] = s.branch || 'main';
+          if (s.id) {
+            // Find default branch for current environment if matches
+            const envId = this.selectedEnvironmentId();
+            const envCfg = s.environments?.find(e => e.environmentId === envId);
+            this.serviceBranches[s.id] = envCfg?.defaultBranch || 'main';
+          }
         });
         this.loading.set(false);
       }

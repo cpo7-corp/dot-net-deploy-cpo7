@@ -43,17 +43,39 @@ export class SettingsComponent implements OnInit {
 
   addVpsEnvironment() {
     const newVps: VpsSettings = {
+      id: '',
       name: 'New Environment',
       host: '',
       username: '',
       password: '',
       port: 22,
-      isLocal: false
+      isLocal: false,
+      environmentTag: '',
+      sharedVariables: [],
+      sharedFileRenames: []
     };
     this.settings.update(s => ({
       ...s,
       vpsEnvironments: [...(s.vpsEnvironments || []), newVps]
     }));
+  }
+
+  addSharedVariable(vps: VpsSettings) {
+    if (!vps.sharedVariables) vps.sharedVariables = [];
+    vps.sharedVariables.push({ key: '', value: '' });
+  }
+
+  removeSharedVariable(vps: VpsSettings, index: number) {
+    vps.sharedVariables?.splice(index, 1);
+  }
+
+  addSharedFileRename(vps: VpsSettings) {
+    if (!vps.sharedFileRenames) vps.sharedFileRenames = [];
+    vps.sharedFileRenames.push({ sourceFileName: '', targetFileName: '' });
+  }
+
+  removeSharedFileRename(vps: VpsSettings, index: number) {
+    vps.sharedFileRenames?.splice(index, 1);
   }
 
   removeVpsEnvironment(index: number) {
