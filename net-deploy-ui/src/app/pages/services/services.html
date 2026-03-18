@@ -57,10 +57,10 @@
                     <div class="spinner-border spinner-border-sm me-2" role="status"></div>
                     Processing...
                   </div>
-                  <span *ngIf="activeActionServiceId !== s.id" class="badge text-white" [ngClass]="{
-                    'bg-success': s.status === 'Running',
-                    'bg-danger': s.status === 'Stopped',
-                    'bg-warning': s.status === 'Unknown' || s.status === 'Error'
+                  <span *ngIf="activeActionServiceId !== s.id" class="badge" [ngClass]="{
+                    'text-bg-success': s.status === 'Running',
+                    'text-bg-danger': s.status === 'Stopped',
+                    'text-bg-warning': s.status === 'Unknown' || s.status === 'Error'
                   }">{{s.status || 'Unknown'}}</span>
                 </td>
                 <td class="text-end pe-4">

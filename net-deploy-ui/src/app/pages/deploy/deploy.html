@@ -156,7 +156,37 @@
           }
         </div>
       </div>
+
+      <!-- Live Deployment Status Summary Table -->
+      <div class="card bg-black text-white border-secondary h-100 font-monospace shadow-lg mt-3" *ngIf="objectKeys(deploymentProgress()).length > 0">
+        <div class="card-header bg-dark border-bottom border-secondary d-flex align-items-center py-2">
+            <h6 class="mb-0 small text-uppercase fw-bold text-secondary">Live Deployment Status</h6>
+        </div>
+        <div class="card-body p-0">
+          <table class="table table-dark table-sm mb-0 align-middle small table-hover">
+            <thead class="text-secondary opacity-50">
+              <tr>
+                <th class="ps-3 py-2">Service Name</th>
+                <th class="text-center">Compiled</th>
+                <th class="text-center">Deployed</th>
+                <th class="text-center">Heartbeat</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (id of objectKeys(deploymentProgress()); track id) {
+                <tr class="border-secondary">
+                  <td class="ps-3 py-2 fw-bold text-info">{{ getServiceName(id) }}</td>
+                  <td class="text-center">{{ deploymentProgress()[id].compiled }}</td>
+                  <td class="text-center">{{ deploymentProgress()[id].deployed }}</td>
+                  <td class="text-center">{{ deploymentProgress()[id].heartbeat }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
+
 
   </div>
 </div>

@@ -28,7 +28,9 @@ export class DeployComponent implements OnInit {
   loading = signal<boolean>(true);
   deploying = signal<boolean>(false);
   logs = signal<DeployLogEntry[]>([]);
+  deploymentProgress = signal<Record<string, { compiled: string; deployed: string; heartbeat: string }>>({});
   elapsedTime = signal<string>('00:00');
+
   failedServiceIds = signal<string[]>([]);
   cloneMultiple = signal<boolean>(false);
   skipBuild = signal<boolean>(false);
@@ -100,6 +102,7 @@ export class DeployComponent implements OnInit {
     this.deploying.set(true);
     this.logs.set([]);
     this.failedServiceIds.set([]);
+    this.deploymentProgress.set({}); // Reset progress
     this.startTimer();
 
     const deploymentConfigs = configs || Array.from(this.selectedServiceIds).map(id => ({
@@ -107,12 +110,23 @@ export class DeployComponent implements OnInit {
       branch: this.serviceBranches[id] || 'main'
     }));
 
+    // Initialize progress for each selected service
+    const initialProgress: any = {};
+    deploymentConfigs.forEach(c => {
+      initialProgress[c.serviceId] = { compiled: '⌛', deployed: '⌛', heartbeat: '⌛' };
+    });
+    this.deploymentProgress.set(initialProgress);
+
     const shouldCloneAll = cloneAllFirst !== null ? cloneAllFirst : this.cloneMultiple();
     const shouldSkipBuild = skipBuild !== null ? skipBuild : this.skipBuild();
 
     this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId(), forceClean, shouldCloneAll, shouldSkipBuild).subscribe({
       next: (entry) => {
         this.logs.update(prev => [...prev, entry]);
+        
+        if (entry.serviceId) {
+          this.updateServiceProgress(entry.serviceId, entry.message, entry.level);
+        }
 
         // Track failed services
         if (entry.level === 'ERROR' && entry.serviceId) {
@@ -121,6 +135,7 @@ export class DeployComponent implements OnInit {
 
         this.scrollToBottom();
       },
+
       complete: () => {
         this.deploying.set(false);
         this.stopTimer();
@@ -157,7 +172,44 @@ export class DeployComponent implements OnInit {
     this.startDeploy(configs, false, false, true);
   }
 
+  updateServiceProgress(serviceId: string, message: string, level: string) {
+    const progress = { ...this.deploymentProgress() };
+    if (!progress[serviceId]) return;
+
+    const row = { ...progress[serviceId] };
+
+    // Compiled
+    if (message.includes('🔨 [Prep] Building')) row.compiled = '🔄';
+    if (message.includes('✅ [Prep] Prepared')) row.compiled = '✅';
+    if (message.includes('⏭️ [Prep] Build output already exists')) row.compiled = '⏭️';
+    if (message.includes('❌ Preparation failed')) row.compiled = '❌';
+
+    // Deployed
+    if (message.includes('🚀 Uploading files') || message.includes('📂 Copying files')) row.deployed = '🚀';
+    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied')) row.deployed = '✅';
+    if (message.includes('❌ Failed to transfer')) row.deployed = '❌';
+
+    // Heartbeat
+    if (message.includes('💓 Checking heartbeat')) row.heartbeat = '💓';
+    if (message.includes('✅ Heartbeat OK')) row.heartbeat = '✅';
+    if (message.includes('⚠️ Heartbeat returned error')) row.heartbeat = '⚠️';
+    if (message.includes('❌ Heartbeat failed')) row.heartbeat = '❌';
+
+    if (level === 'ERROR') {
+        if (row.compiled === '🔄') row.compiled = '❌';
+        if (row.deployed === '🚀' || row.deployed === '⌛') row.deployed = '❌';
+    }
+
+    progress[serviceId] = row;
+    this.deploymentProgress.set(progress);
+  }
+
+  objectKeys(obj: any) { return Object.keys(obj); }
+  getServiceName(id: string) { return this.services().find(s => s.id === id)?.name || 'Unknown'; }
+
+
   getLogClass(level: string): string {
+
     return `log-${level.toLowerCase()}`;
   }
 
