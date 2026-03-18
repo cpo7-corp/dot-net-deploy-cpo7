@@ -1,7 +1,7 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { TranslateModule } from '@ngx-translate/core';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ServicesMonitorService } from '../../services/services-monitor.service';
 import { DeployService } from '../../services/deploy.service';
 import { SettingsService } from '../../services/settings.service';
@@ -18,6 +18,7 @@ export class DeployComponent implements OnInit {
   private servicesSvc = inject(ServicesMonitorService);
   private deploySvc = inject(DeployService);
   private settingsSvc = inject(SettingsService);
+  private translate = inject(TranslateService);
 
   services = signal<ServiceStatus[]>([]);
   environments = signal<VpsSettings[]>([]);
@@ -139,7 +140,7 @@ export class DeployComponent implements OnInit {
     const deploy = retryMode === 3 ? true : this.deployTransfer();
 
     this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId(), forceClean, pull, build, deploy).subscribe({
-      next: (entry) => {
+      next: (entry: DeployLogEntry) => {
         if (entry.level === 'SESSION_ID') {
           this.currentSessionId.set(entry.message);
           return;
@@ -160,6 +161,7 @@ export class DeployComponent implements OnInit {
       },
 
       complete: () => {
+        this.addDeploymentSummary();
         this.deploying.set(false);
         this.currentSessionId.set(null);
         this.isPaused.set(false);
@@ -171,7 +173,7 @@ export class DeployComponent implements OnInit {
           this.loading.set(false);
         });
       },
-      error: (err) => {
+      error: (err: any) => {
         this.deploying.set(false);
         this.currentSessionId.set(null);
         this.isPaused.set(false);
@@ -268,6 +270,36 @@ export class DeployComponent implements OnInit {
 
 
   objectKeys(obj: any) { return Object.keys(obj); }
+  private addDeploymentSummary() {
+    const summaryHeader = this.translate.instant('deploymentSummary');
+    const totalTimeLabel = this.translate.instant('totalTime');
+    const buildTimeLabel = this.translate.instant('buildTime');
+    const totalDuration = this.elapsedTime();
+    
+    this.logs.update(prev => [...prev, 
+      { sessionId: 'client', level: 'SUCCESS', message: '========================================', timestamp: new Date().toISOString() },
+      { sessionId: 'client', level: 'SUCCESS', message: `📊 ${summaryHeader.toUpperCase()}`, timestamp: new Date().toISOString() },
+      { sessionId: 'client', level: 'SUCCESS', message: '----------------------------------------', timestamp: new Date().toISOString() }
+    ]);
+
+    const progress = this.deploymentProgress();
+    Object.keys(progress).forEach(id => {
+      const name = this.getServiceName(id);
+      const bTime = progress[id].buildTime || 'N/A';
+      this.logs.update(prev => [...prev, 
+        { sessionId: 'client', level: 'INFO', message: `🔹 ${name}: ${buildTimeLabel}: ${bTime}`, timestamp: new Date().toISOString() }
+      ]);
+    });
+
+    this.logs.update(prev => [...prev, 
+      { sessionId: 'client', level: 'SUCCESS', message: '----------------------------------------', timestamp: new Date().toISOString() },
+      { sessionId: 'client', level: 'SUCCESS', message: `🏁 ${totalTimeLabel}: ${totalDuration}`, timestamp: new Date().toISOString() },
+      { sessionId: 'client', level: 'SUCCESS', message: '========================================', timestamp: new Date().toISOString() }
+    ]);
+    
+    this.scrollToBottom();
+  }
+
   getServiceName(id: string) { return this.services().find(s => s.id === id)?.name || 'Unknown'; }
 
 
