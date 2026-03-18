@@ -18,12 +18,24 @@ export class DeployService extends ApiService {
    * Triggers a deploy and returns an Observable that streams log entries
    * via Server-Sent Events (SSE).
    */
-  deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null, forceClean: boolean = false, cloneAllFirst: boolean = false, skipBuildIfOutputExists: boolean = false): Observable<DeployLogEntry> {
-    return this.streamLogs(`${this.baseUrl}/deploy`, { services, environmentId, forceClean, cloneAllFirst, skipBuildIfOutputExists });
+  deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null, forceClean: boolean = false, pull: boolean = true, build: boolean = true, deploy: boolean = true): Observable<DeployLogEntry> {
+    return this.streamLogs(`${this.baseUrl}/deploy`, { services, environmentId, forceClean, pull, build, deploy });
   }
 
   serviceAction(serviceId: string, environmentId: string, action: string): Observable<DeployLogEntry> {
     return this.streamLogs(`${this.baseUrl}/deploy/service-action`, { serviceId, environmentId, action });
+  }
+
+  stop(sessionId: string): Observable<any> {
+    return this.http!.post(`${this.baseUrl}/deploy/stop/${sessionId}`, {});
+  }
+
+  pause(sessionId: string): Observable<any> {
+    return this.http!.post(`${this.baseUrl}/deploy/pause/${sessionId}`, {});
+  }
+
+  resume(sessionId: string): Observable<any> {
+    return this.http!.post(`${this.baseUrl}/deploy/resume/${sessionId}`, {});
   }
 
   private streamLogs(url: string, body: any): Observable<DeployLogEntry> {

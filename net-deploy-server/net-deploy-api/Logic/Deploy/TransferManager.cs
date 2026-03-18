@@ -23,7 +23,24 @@ public class TransferManager
                 else
                 {
                     await log("INFO", $"📂 Copying files to Local server at {remotePath}...", serviceId);
+                    
+                    var offlineFilePath = Path.Combine(remotePath, "app_offline.htm");
+                    try 
+                    {
+                        if (!Directory.Exists(remotePath)) Directory.CreateDirectory(remotePath);
+                        await File.WriteAllTextAsync(offlineFilePath, "<html><body><h1 style='text-align:center;margin-top:20%'>Updating... Please wait.</h1></body></html>");
+                        await Task.Delay(2000); // Wait for IIS to unload the app domain and release file locks
+                    } 
+                    catch { }
+
                     FileHelper.CopyDirectory(localPath, remotePath);
+                    
+                    try 
+                    {
+                        if (File.Exists(offlineFilePath)) File.Delete(offlineFilePath);
+                    } 
+                    catch { }
+
                     await log("SUCCESS", $"✅ Files copied locally to {remotePath}", serviceId);
                 }
                 return true; 
@@ -32,6 +49,7 @@ public class TransferManager
             {
                 if (attempt == maxTransferAttempts) 
                 {
+                    try { if (File.Exists(Path.Combine(remotePath, "app_offline.htm"))) File.Delete(Path.Combine(remotePath, "app_offline.htm")); } catch { }
                     throw new Exception($"Failed to transfer to {remotePath}: {ex.Message}", ex);
                 }
                 await log("WARNING", $"⚠️ Transfer attempt {attempt} failed: {ex.Message}. Retrying in 5s...", serviceId);

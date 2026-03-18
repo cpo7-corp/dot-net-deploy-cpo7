@@ -13,6 +13,17 @@ using System.Threading;
 
 namespace NET.Deploy.Api.Controllers;
 
+public record ServiceDeploymentConfig(string ServiceId, string? Branch);
+public record ServiceActionRequest(string ServiceId, string EnvironmentId, string Action);
+public record DeployRequest(
+    List<ServiceDeploymentConfig> Services, 
+    string? EnvironmentId, 
+    bool ForceClean = false, 
+    bool Pull = true, 
+    bool Build = true, 
+    bool Deploy = true);
+
+
 [ApiController]
 [Route("api/[controller]")]
 public class DeployController(
@@ -21,10 +32,50 @@ public class DeployController(
     SettingsLogic settingsLogic,
     DeployLogsLogic deployLogsLogic) : ControllerBase
 {
+    private static readonly ConcurrentDictionary<string, (CancellationTokenSource Cts, ManualResetEventSlim PauseEvent)> _activeSessions = new();
+
     /// <summary>
-    /// Deploy selected services.
-    /// Returns Server-Sent Events (SSE) stream so the UI can show live log output.
+    /// Stop an active deployment session.
     /// </summary>
+    [HttpPost("stop/{sessionId}")]
+    public IActionResult Stop(string sessionId)
+    {
+        if (_activeSessions.TryGetValue(sessionId, out var session))
+        {
+            session.Cts.Cancel();
+            session.PauseEvent.Set(); // Ensure it's not stuck in pause
+            return Ok(new { message = "Stop request sent." });
+        }
+        return NotFound();
+    }
+
+    /// <summary>
+    /// Pause an active deployment session.
+    /// </summary>
+    [HttpPost("pause/{sessionId}")]
+    public IActionResult Pause(string sessionId)
+    {
+        if (_activeSessions.TryGetValue(sessionId, out var session))
+        {
+            session.PauseEvent.Reset();
+            return Ok(new { message = "Paused." });
+        }
+        return NotFound();
+    }
+
+    /// <summary>
+    /// Resume a paused deployment session.
+    /// </summary>
+    [HttpPost("resume/{sessionId}")]
+    public IActionResult Resume(string sessionId)
+    {
+        if (_activeSessions.TryGetValue(sessionId, out var session))
+        {
+            session.PauseEvent.Set();
+            return Ok(new { message = "Resumed." });
+        }
+        return NotFound();
+    }
     [HttpPost]
     public async Task Deploy([FromBody] DeployRequest request)
     {
@@ -33,148 +84,111 @@ public class DeployController(
         Response.Headers.Connection = "keep-alive";
 
         var sessionId = Guid.NewGuid().ToString();
-        var settings = await settingsLogic.GetAsync();
-        var logEntries = new List<DeployLogEntryDB>();
+        var cts = new CancellationTokenSource();
+        var pauseEvent = new ManualResetEventSlim(true);
+        _activeSessions[sessionId] = (cts, pauseEvent);
 
+        var logEntries = new List<DeployLogEntryDB>();
         var responseLock = new SemaphoreSlim(1, 1);
 
         async Task Log(string level, string message, string? serviceId = null)
         {
-            var entry = new DeployLogEntryDB
-            {
-                SessionId = sessionId,
-                Level = level,
-                Message = message,
-                ServiceId = serviceId,
-                Timestamp = DateTime.UtcNow
-            };
-
-            lock (logEntries)
-            {
-                logEntries.Add(entry);
-            }
-
+            var entry = new DeployLogEntryDB { SessionId = sessionId, Level = level, Message = message, ServiceId = serviceId, Timestamp = DateTime.UtcNow };
+            lock (logEntries) { logEntries.Add(entry); }
             var line = $"data: {{\"level\":\"{level}\",\"message\":{System.Text.Json.JsonSerializer.Serialize(message)},\"serviceId\":\"{serviceId}\"}}\n\n";
-
             await responseLock.WaitAsync();
-            try
-            {
-                await Response.WriteAsync(line);
-                await Response.Body.FlushAsync();
-            }
-            finally
-            {
-                responseLock.Release();
-            }
+            try { await Response.WriteAsync(line); await Response.Body.FlushAsync(); }
+            finally { responseLock.Release(); }
         }
 
-        var vpsSettings = settings.VpsEnvironments.FirstOrDefault(e => e.Id == request.EnvironmentId)
-                          ?? settings.VpsEnvironments.FirstOrDefault()
-                          ?? new VpsSettings();
-
-        // Shared across all services in this request.
-        // Ensures each repository is pulled/cloned ONLY once per session.
-        var repoUpdateTasks = new ConcurrentDictionary<string, Task<bool>>();
-
-        // Tracks build/config status for each specific service.
-        var servicePrepTasks = new ConcurrentDictionary<string, Task<bool>>();
-
-        // Helper to get or start a prep task for a specific service's repository + build
-        Task<bool> EnsureServicePrepared(ServiceDefinitionDB srv, string? branchOverride)
+        try
         {
-            var envCfg = srv.Environments.FirstOrDefault(e => e.EnvironmentId == vpsSettings.Id);
-            var defaultBranch = envCfg?.DefaultBranch ?? "main";
-            var branchKey = branchOverride ?? defaultBranch;
-            var prepKey = $"{srv.Id}|{branchKey}";
+            await Log("SESSION_ID", sessionId); // UI uses this to call Stop/Pause
+            var settings = await settingsLogic.GetAsync();
 
-            return servicePrepTasks.GetOrAdd(prepKey, async _ => 
+            var vpsSettings = settings.VpsEnvironments.FirstOrDefault(e => e.Id == request.EnvironmentId)
+                              ?? settings.VpsEnvironments.FirstOrDefault()
+                              ?? new VpsSettings();
+
+            var repoUpdateTasks = new ConcurrentDictionary<string, Task<bool>>();
+            var servicePrepTasks = new ConcurrentDictionary<string, Task<bool>>();
+
+            Task<bool> EnsureServicePrepared(ServiceDefinitionDB srv, string? branchOverride)
             {
-                var (repoUrl, gitBranch, _) = deployLogic.ParseGitUrl(srv.RepoUrl);
-                var effectiveRepoBranch = branchOverride ?? (string.IsNullOrWhiteSpace(envCfg?.DefaultBranch) ? gitBranch : envCfg.DefaultBranch);
-                var repoKey = $"{repoUrl}|{effectiveRepoBranch}";
+                var envCfg = srv.Environments.FirstOrDefault(e => e.EnvironmentId == vpsSettings.Id);
+                var defaultBranch = envCfg?.DefaultBranch ?? "main";
+                var branchKey = branchOverride ?? defaultBranch;
+                var prepKey = $"{srv.Id}|{branchKey}";
 
-                // Ensure the repo is updated exactly once in this session.
-                // Subsequent services using the same repo/branch will skip the pull phase.
-                var repoUpdated = await repoUpdateTasks.GetOrAdd(repoKey, _ => 
-                    deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean)
-                );
+                return servicePrepTasks.GetOrAdd(prepKey, async _ => 
+                {
+                    var (repoUrl, gitBranch, _) = deployLogic.ParseGitUrl(srv.RepoUrl);
+                    var effectiveRepoBranch = branchOverride ?? (string.IsNullOrWhiteSpace(envCfg?.DefaultBranch) ? gitBranch : envCfg.DefaultBranch);
+                    var repoKey = $"{repoUrl}|{effectiveRepoBranch}";
 
-                if (!repoUpdated) return false;
+                    var repoUpdated = !request.Pull || await repoUpdateTasks.GetOrAdd(repoKey, _ => 
+                        deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean)
+                    );
 
-                // Now build specifically this service (skipping pull, but using the already-pulled/cloned folder)
-                return await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, request.SkipBuildIfOutputExists);
-            });
-        }
+                    if (!repoUpdated) return false;
+                    return await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, skipBuildIfOutputExists: !request.Build);
+                });
+            }
 
+            if (request.Pull)
+            {
+                await Log("INFO", "🔍 [PHASE 1] Preparing all services (Pull, Build, Config)...");
+                foreach (var config in request.Services)
+                {
+                    if (cts.IsCancellationRequested) break;
+                    pauseEvent.Wait();
 
-        // PHASE 1: Full Preparation (Clone + Build + Config all first)
-        if (request.CloneAllFirst)
-        {
-            await Log("INFO", "🔍 [PHASE 1] Preparing all services (Clone, Build, Config)...");
+                    var srv = await servicesLogic.GetByIdAsync(config.ServiceId);
+                    if (srv != null) await EnsureServicePrepared(srv, config.Branch);
+                }
+                if (cts.IsCancellationRequested) { await Log("WARNING", "🛑 [PHASE 1] Deployment cancelled."); return; }
+                await Log("INFO", "✅ [PHASE 1] All services prepared. Starting next phase...");
+            }
+
+            var results = new List<(string Name, bool Success)>();
             foreach (var config in request.Services)
             {
-                var srv = await servicesLogic.GetByIdAsync(config.ServiceId);
-                if (srv != null)
-                {
-                    // Trigger the prep task and wait for it. 
-                    await EnsureServicePrepared(srv, config.Branch);
-                }
+                if (cts.IsCancellationRequested) break;
+                pauseEvent.Wait();
+
+                var service = await servicesLogic.GetByIdAsync(config.ServiceId);
+                if (service is null) { await Log("WARNING", $"⚠️ Service {config.ServiceId} not found."); continue; }
+
+                var prepSuccess = await EnsureServicePrepared(service, config.Branch);
+                if (!prepSuccess) { await Log("ERROR", $"❌ Preparation failed for {service.Name}."); results.Add((service.Name, false)); continue; }
+
+                if (!request.Deploy) { await Log("SUCCESS", $"✅ {service.Name} built (Deployment skipped)."); results.Add((service.Name, true)); continue; }
+
+                var success = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, skipBuildIfOutputExists: true);
+                if (success) await servicesLogic.MarkDeployedAsync(service.Id!);
+                results.Add((service.Name, success));
             }
-            await Log("INFO", "✅ [PHASE 1] All services prepared (Builds & Configs ready). Starting transfers...");
+
+            if (cts.IsCancellationRequested) await Log("WARNING", "🛑 Deployment stopped by user.");
+
+            await Log("INFO", "──────────────────────────────────────────────────");
+            await Log("INFO", "📊 DEPLOYMENT SUMMARY:");
+            foreach (var res in results) await Log("INFO", $"  • {res.Name.PadRight(20)} : {(res.Success ? "✅ SUCCESS" : "❌ FAILED")}");
+
+            var successCount = results.Count(r => r.Success);
+            var level = successCount == results.Count ? "SUCCESS" : (successCount == 0 ? "ERROR" : "WARNING");
+            await Log(level, $"🏁 Final Result: {successCount}/{results.Count} services deployed.");
+            await Log("INFO", "──────────────────────────────────────────────────");
+
+            await deployLogsLogic.AddRangeAsync(logEntries);
+            await Response.WriteAsync("data: {\"level\":\"DONE\",\"message\":\"done\"}\n\n");
+            await Response.Body.FlushAsync();
         }
-
-        var deployTasks = request.Services.Select(async config =>
+        finally
         {
-            var serviceId = config.ServiceId;
-            var service = await servicesLogic.GetByIdAsync(serviceId);
-            if (service is null)
-            {
-                await Log("WARNING", $"⚠️ Service {serviceId} not found – skipping.");
-                return (Name: $"Unknown ({serviceId})", Success: false);
-            }
-
-            // Always ensure the service is prepared (Clone + Build + Config)
-            // If PHASE 1 already ran, EnsureServicePrepared will return the already-completed task.
-            var prepSuccess = await EnsureServicePrepared(service, config.Branch);
-            if (!prepSuccess)
-            {
-                await Log("ERROR", $"❌ Preparation failed for {service.Name} – skipping remaining steps.");
-                return (Name: service.Name, Success: false);
-            }
-
-            // Proceed to deploy (phase 2: transfer & restart)
-            // We set skipBuildIfOutputExists to true because we just prepared it.
-            var success = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, skipBuildIfOutputExists: true);
-
-            if (success)
-                await servicesLogic.MarkDeployedAsync(serviceId);
-
-            return (Name: service.Name, Success: success);
-        });
-
-        var resultsArray = await Task.WhenAll(deployTasks);
-        var results = resultsArray.ToList();
-
-        await Log("INFO", "──────────────────────────────────────────────────");
-        await Log("INFO", "📊 DEPLOYMENT SUMMARY:");
-        foreach (var res in results)
-        {
-            var status = res.Success ? "✅ SUCCESS" : "❌ FAILED";
-            await Log("INFO", $"  • {res.Name.PadRight(20)} : {status}");
+            _activeSessions.TryRemove(sessionId, out _);
+            cts.Dispose();
         }
-
-        var totalCount = results.Count;
-        var successCount = results.Count(r => r.Success);
-        var level = successCount == totalCount ? "SUCCESS" : (successCount == 0 ? "ERROR" : "WARNING");
-
-        await Log(level, $"🏁 Final Result: {successCount}/{totalCount} services deployed successfully.");
-        await Log("INFO", "──────────────────────────────────────────────────");
-
-        // Persist the whole session log to MongoDB
-        await deployLogsLogic.AddRangeAsync(logEntries);
-
-        await Response.WriteAsync("data: {\"level\":\"DONE\",\"message\":\"done\"}\n\n");
-        await Response.Body.FlushAsync();
     }
 
     [HttpPost("service-action")]
@@ -223,8 +237,4 @@ public class DeployController(
     [HttpGet("sessions-paged")]
     public async Task<ActionResult<List<DeployLogsLogic.SessionSummary>>> GetSessionsPaged([FromQuery] int skip = 0, [FromQuery] int limit = 20) =>
         Ok(await deployLogsLogic.GetSessionsPagedAsync(skip, limit));
-
-    public record ServiceDeploymentConfig(string ServiceId, string? Branch);
-    public record ServiceActionRequest(string ServiceId, string EnvironmentId, string Action);
-    public record DeployRequest(List<ServiceDeploymentConfig> Services, string? EnvironmentId, bool ForceClean = false, bool CloneAllFirst = false, bool SkipBuildIfOutputExists = false);
 }

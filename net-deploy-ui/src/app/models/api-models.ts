@@ -69,7 +69,7 @@ export interface DeployLogEntry {
   id?: string;
   sessionId: string;
   timestamp: string | Date;
-  level: 'INFO' | 'SUCCESS' | 'ERROR' | 'WARNING' | 'DONE';
+  level: 'INFO' | 'SUCCESS' | 'ERROR' | 'WARNING' | 'DONE' | 'SESSION_ID';
   message: string;
   serviceId?: string;
 }

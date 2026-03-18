@@ -68,10 +68,22 @@ export class ServicesComponent implements OnInit {
     this.settingsSvc.getSettings().subscribe(s => {
       const envs = s.vpsEnvironments || [];
       this.environments.set(envs);
-      if (envs.length > 0 && !this.targetEnvId) {
+      
+      const savedEnvId = localStorage.getItem('lastTargetEnvId');
+      const exists = envs.some(e => e.id === savedEnvId);
+
+      if (savedEnvId && exists) {
+        this.targetEnvId = savedEnvId;
+      } else if (envs.length > 0) {
         this.targetEnvId = envs[0].id || null;
       }
     });
+  }
+
+  onTargetEnvChange(id: string | null) {
+    if (id) {
+      localStorage.setItem('lastTargetEnvId', id);
+    }
   }
 
   runAction(serviceId: string, action: string) {

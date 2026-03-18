@@ -33,8 +33,12 @@ export class DeployComponent implements OnInit {
 
 
   failedServiceIds = signal<string[]>([]);
-  cloneMultiple = signal<boolean>(false);
-  skipBuild = signal<boolean>(false);
+  deployPull = signal<boolean>(true);
+  deployBuild = signal<boolean>(true);
+  deployTransfer = signal<boolean>(true);
+  
+  currentSessionId = signal<string | null>(null);
+  isPaused = signal<boolean>(false);
   private timerInterval: any;
   private startTime: number = 0;
 
@@ -109,7 +113,7 @@ export class DeployComponent implements OnInit {
     this.selectedServiceIds.clear();
   }
 
-  startDeploy(configs?: { serviceId: string, branch: string }[], forceClean: boolean = true, cloneAllFirst: boolean | null = null, skipBuild: boolean | null = null) {
+  startDeploy(configs?: { serviceId: string, branch: string }[], forceClean: boolean = true, retryMode?: number) {
     if (!configs && this.selectedServiceIds.size === 0) return;
 
     this.deploying.set(true);
@@ -130,15 +134,19 @@ export class DeployComponent implements OnInit {
     });
     this.deploymentProgress.set(initialProgress);
 
+    const pull = retryMode === 3 ? false : this.deployPull();
+    const build = retryMode === 3 ? false : this.deployBuild();
+    const deploy = retryMode === 3 ? true : this.deployTransfer();
 
-
-    const shouldCloneAll = cloneAllFirst !== null ? cloneAllFirst : this.cloneMultiple();
-    const shouldSkipBuild = skipBuild !== null ? skipBuild : this.skipBuild();
-
-    this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId(), forceClean, shouldCloneAll, shouldSkipBuild).subscribe({
+    this.deploySvc.deploy(deploymentConfigs, this.selectedEnvironmentId(), forceClean, pull, build, deploy).subscribe({
       next: (entry) => {
+        if (entry.level === 'SESSION_ID') {
+          this.currentSessionId.set(entry.message);
+          return;
+        }
+
         this.logs.update(prev => [...prev, entry]);
-        
+
         if (entry.serviceId) {
           this.updateServiceProgress(entry.serviceId, entry.message, entry.level);
         }
@@ -153,6 +161,8 @@ export class DeployComponent implements OnInit {
 
       complete: () => {
         this.deploying.set(false);
+        this.currentSessionId.set(null);
+        this.isPaused.set(false);
         this.stopTimer();
         // Reload services to update status/last deployed date
         this.loading.set(true);
@@ -163,6 +173,8 @@ export class DeployComponent implements OnInit {
       },
       error: (err) => {
         this.deploying.set(false);
+        this.currentSessionId.set(null);
+        this.isPaused.set(false);
         this.stopTimer();
         console.error('Deploy error', err);
         this.logs.update(prev => [...prev, {
@@ -184,7 +196,26 @@ export class DeployComponent implements OnInit {
       branch: this.serviceBranches[id] || 'main'
     }));
 
-    this.startDeploy(configs, false, false, true);
+    // Retry just skips clone and build to purely retry transfer.
+    this.startDeploy(configs, false, 3);
+  }
+
+  stopDeployment() {
+    const sid = this.currentSessionId();
+    if (sid) {
+      this.deploySvc.stop(sid).subscribe();
+    }
+  }
+
+  togglePause() {
+    const sid = this.currentSessionId();
+    if (!sid) return;
+
+    if (this.isPaused()) {
+      this.deploySvc.resume(sid).subscribe(() => this.isPaused.set(false));
+    } else {
+      this.deploySvc.pause(sid).subscribe(() => this.isPaused.set(true));
+    }
   }
 
   updateServiceProgress(serviceId: string, message: string, level: string) {
@@ -195,21 +226,21 @@ export class DeployComponent implements OnInit {
 
     // Compiled
     if (message.includes('🔨 [Prep] Building')) {
-        row.compiled = 'process';
-        row.buildStartTime = Date.now();
+      row.compiled = 'process';
+      row.buildStartTime = Date.now();
     }
     if (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists') || message.includes('❌ Preparation failed')) {
-        if (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists')) {
-            row.compiled = 'success';
-        }
-        else {
-            row.compiled = 'error';
-        }
+      if (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists')) {
+        row.compiled = 'success';
+      }
+      else {
+        row.compiled = 'error';
+      }
 
-        if (row.buildStartTime) {
-            const duration = ((Date.now() - row.buildStartTime) / 1000).toFixed(1);
-            row.buildTime = duration + 's';
-        }
+      if (row.buildStartTime) {
+        const duration = ((Date.now() - row.buildStartTime) / 1000).toFixed(1);
+        row.buildTime = duration + 's';
+      }
     }
 
 
@@ -225,9 +256,9 @@ export class DeployComponent implements OnInit {
     if (message.includes('❌ Heartbeat failed')) row.heartbeat = 'error';
 
     if (level === 'ERROR') {
-        if (row.compiled === 'process' || row.compiled === 'pending') row.compiled = 'error';
-        if (row.deployed === 'process' || row.deployed === 'pending') row.deployed = 'error';
-        if (row.heartbeat === 'process' || row.heartbeat === 'pending') row.heartbeat = 'error';
+      if (row.compiled === 'process' || row.compiled === 'pending') row.compiled = 'error';
+      if (row.deployed === 'process' || row.deployed === 'pending') row.deployed = 'error';
+      if (row.heartbeat === 'process' || row.heartbeat === 'pending') row.heartbeat = 'error';
     }
 
     progress[serviceId] = row;

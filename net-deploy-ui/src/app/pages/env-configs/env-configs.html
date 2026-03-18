@@ -10,7 +10,7 @@
     <div class="table-responsive">
       <table class="table table-dark table-hover mb-0 align-middle">
         <thead>
-          <tr class="text-secondary small text-uppercase">
+          <tr class="text-secondary small">
             <th class="ps-4">Name</th>
             <th>Source File</th>
             <th>File to Rename</th>
@@ -56,19 +56,19 @@
         <div class="modal-body">
           <div class="row g-3">
             <div class="col-12">
-              <label class="form-label text-secondary small text-uppercase">Descriptive Name (ID)</label>
+              <label class="form-label text-secondary small">Descriptive Name (ID)</label>
               <input type="text" class="form-control bg-dark text-white border-secondary" 
                      [(ngModel)]="(selectedConfig || newConfig).name" placeholder="e.g. Identity-Production-Core">
             </div>
 
             <div class="col-md-6">
-              <label class="form-label text-secondary small text-uppercase">Source File Name</label>
+              <label class="form-label text-secondary small">Source File Name</label>
               <input type="text" class="form-control bg-dark text-white border-secondary" 
                      [(ngModel)]="(selectedConfig || newConfig).sourceFileName" placeholder="e.g. appsettings.prod.json">
             </div>
 
             <div class="col-md-6">
-              <label class="form-label text-secondary small text-uppercase">Target File to Rename</label>
+              <label class="form-label text-secondary small">Target File to Rename</label>
               <input type="text" class="form-control bg-dark text-white border-secondary" 
                      [(ngModel)]="(selectedConfig || newConfig).targetFileName" placeholder="e.g. appsettings.json">
             </div>
