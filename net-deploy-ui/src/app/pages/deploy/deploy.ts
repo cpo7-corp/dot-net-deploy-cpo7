@@ -66,6 +66,7 @@ export class DeployComponent implements OnInit {
       } else if (data.vpsEnvironments?.length > 0) {
         this.selectedEnvironmentId.set(data.vpsEnvironments[0].id || null);
       }
+      this.updateDefaultBranches();
     });
   }
 
@@ -73,6 +74,17 @@ export class DeployComponent implements OnInit {
     if (id) {
       localStorage.setItem('lastEnvironmentId', id);
     }
+    this.updateDefaultBranches();
+  }
+
+  private updateDefaultBranches() {
+    const envId = this.selectedEnvironmentId();
+    this.services().forEach(s => {
+      if (s.id) {
+        const envCfg = s.environments?.find(e => e.environmentId === envId);
+        this.serviceBranches[s.id] = envCfg?.defaultBranch || 'main';
+      }
+    });
   }
 
   setServiceBranch(id: string, branch: string) {

@@ -36,9 +36,13 @@ NET Deploy is a powerful tool designed to automate the process of pulling, build
 - Click **Deploy Selected** to start the automated process.
 
 ## System Requirements
-- .NET 8.0+ SDK (for building).
-- Node.js (for UI and Node.js builds).
-- SSH/SFTP access to target VPS.
+
+> ⚠️ All of the following must be installed on the **server machine** that runs the API.
+
+- **[Git](https://git-scm.com/download/win)** *(Required)* — Used to clone and pull repositories. Must be installed on the server.
+- **.NET 10.0+ Runtime** — Required to run the API server. [Download](https://dotnet.microsoft.com/download)
+- **Node.js + npm** *(Optional)* — Required only if deploying Angular/React projects. [Download](https://nodejs.org)
+- **SSH/SFTP access** *(Optional)* — Required only when deploying to a remote VPS.
 
 ---
 

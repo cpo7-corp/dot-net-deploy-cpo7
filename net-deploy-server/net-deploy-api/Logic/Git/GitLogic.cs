@@ -23,6 +23,9 @@ public class GitLogic(ILogger<GitLogic> logger)
 
         try
         {
+            // Ensure base directory exists
+            Directory.CreateDirectory(git.LocalBaseDir);
+
             var authUrl = BuildAuthUrl(git, repoUrl);
 
             // 1. Force Clean Logic
@@ -217,11 +220,15 @@ public class GitLogic(ILogger<GitLogic> logger)
         return $"{uri.Scheme}://x-access-token:{git.Token}@{uri.Host}{uri.PathAndQuery}";
     }
 
+
     private async Task<bool> RunGitAsync(string workingDir, string arguments, string operation, Deploy.LogCallback? log = null)
     {
+        Directory.CreateDirectory(workingDir);
+
+        var gitExe = Deploy.ExeResolver.Resolve("git");
         // -c credential.helper= forces git to ignore any locally saved credentials on the machine
         var fullArgs = $"-c credential.helper= {arguments}";
-        var psi = new ProcessStartInfo("git", fullArgs)
+        var psi = new ProcessStartInfo(gitExe, fullArgs)
         {
             WorkingDirectory = workingDir,
             RedirectStandardOutput = true,

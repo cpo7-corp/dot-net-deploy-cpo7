@@ -6,7 +6,8 @@ public class ProcessRunner
 {
     public async Task<bool> RunAsync(string command, string arguments, string workingDir, LogCallback log, string? serviceId)
     {
-        var psi = new ProcessStartInfo(command, arguments)
+        var resolvedCommand = ExeResolver.Resolve(command);
+        var psi = new ProcessStartInfo(resolvedCommand, arguments)
         {
             WorkingDirectory = workingDir,
             RedirectStandardOutput = true,
