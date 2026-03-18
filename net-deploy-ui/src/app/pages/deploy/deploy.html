@@ -167,7 +167,7 @@
             <thead class="text-secondary opacity-50">
               <tr>
                 <th class="ps-3 py-2">Service Name</th>
-                <th class="text-center">Compiled</th>
+                <th class="text-center">Build</th>
                 <th class="text-center">Deployed</th>
                 <th class="text-center">Heartbeat</th>
               </tr>
@@ -176,17 +176,34 @@
               @for (id of objectKeys(deploymentProgress()); track id) {
                 <tr class="border-secondary">
                   <td class="ps-3 py-2 fw-bold text-info">{{ getServiceName(id) }}</td>
-                  <td class="text-center">{{ deploymentProgress()[id].compiled }}</td>
-                  <td class="text-center">{{ deploymentProgress()[id].deployed }}</td>
-                  <td class="text-center">{{ deploymentProgress()[id].heartbeat }}</td>
+                  <td class="text-center">
+                    <div class="d-flex align-items-center justify-content-center gap-2">
+                        <ng-container [ngTemplateOutlet]="statusIcon" [ngTemplateOutletContext]="{ status: deploymentProgress()[id].compiled }"></ng-container>
+                        <span class="text-secondary smaller opacity-75" *ngIf="deploymentProgress()[id].buildTime">({{ deploymentProgress()[id].buildTime }})</span>
+                    </div>
+                  </td>
+                  <td class="text-center">
+                    <ng-container [ngTemplateOutlet]="statusIcon" [ngTemplateOutletContext]="{ status: deploymentProgress()[id].deployed }"></ng-container>
+                  </td>
+                  <td class="text-center">
+                    <ng-container [ngTemplateOutlet]="statusIcon" [ngTemplateOutletContext]="{ status: deploymentProgress()[id].heartbeat }"></ng-container>
+                  </td>
                 </tr>
               }
             </tbody>
+
+
           </table>
         </div>
       </div>
     </div>
-
-
   </div>
 </div>
+
+<ng-template #statusIcon let-status="status">
+  @if (status === 'success') { <i class="bi bi-check-lg text-success fs-5"></i> }
+  @else if (status === 'error') { <i class="bi bi-x-lg text-danger fs-5"></i> }
+  @else if (status === 'process') { <div class="spinner-border spinner-border-sm text-primary" role="status"></div> }
+  @else if (status === 'skip') { <i class="bi bi-skip-forward-fill text-secondary opacity-50"></i> }
+  @else { <span class="text-secondary opacity-25">—</span> }
+</ng-template>

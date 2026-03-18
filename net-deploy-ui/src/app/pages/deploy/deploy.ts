@@ -28,8 +28,9 @@ export class DeployComponent implements OnInit {
   loading = signal<boolean>(true);
   deploying = signal<boolean>(false);
   logs = signal<DeployLogEntry[]>([]);
-  deploymentProgress = signal<Record<string, { compiled: string; deployed: string; heartbeat: string }>>({});
+  deploymentProgress = signal<Record<string, { compiled: string; deployed: string; heartbeat: string; buildTime: string; buildStartTime?: number }>>({});
   elapsedTime = signal<string>('00:00');
+
 
   failedServiceIds = signal<string[]>([]);
   cloneMultiple = signal<boolean>(false);
@@ -113,9 +114,11 @@ export class DeployComponent implements OnInit {
     // Initialize progress for each selected service
     const initialProgress: any = {};
     deploymentConfigs.forEach(c => {
-      initialProgress[c.serviceId] = { compiled: '⌛', deployed: '⌛', heartbeat: '⌛' };
+      initialProgress[c.serviceId] = { compiled: 'pending', deployed: 'pending', heartbeat: 'pending', buildTime: '' };
     });
     this.deploymentProgress.set(initialProgress);
+
+
 
     const shouldCloneAll = cloneAllFirst !== null ? cloneAllFirst : this.cloneMultiple();
     const shouldSkipBuild = skipBuild !== null ? skipBuild : this.skipBuild();
@@ -179,30 +182,43 @@ export class DeployComponent implements OnInit {
     const row = { ...progress[serviceId] };
 
     // Compiled
-    if (message.includes('🔨 [Prep] Building')) row.compiled = '🔄';
-    if (message.includes('✅ [Prep] Prepared')) row.compiled = '✅';
-    if (message.includes('⏭️ [Prep] Build output already exists')) row.compiled = '⏭️';
-    if (message.includes('❌ Preparation failed')) row.compiled = '❌';
+    if (message.includes('🔨 [Prep] Building')) {
+        row.compiled = 'process';
+        row.buildStartTime = Date.now();
+    }
+    if (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists') || message.includes('❌ Preparation failed')) {
+        if (message.includes('✅ [Prep] Prepared')) row.compiled = 'success';
+        else if (message.includes('⏭️ [Prep] Build output already exists')) row.compiled = 'skip';
+        else row.compiled = 'error';
+
+        if (row.buildStartTime) {
+            const duration = ((Date.now() - row.buildStartTime) / 1000).toFixed(1);
+            row.buildTime = duration + 's';
+        }
+    }
 
     // Deployed
-    if (message.includes('🚀 Uploading files') || message.includes('📂 Copying files')) row.deployed = '🚀';
-    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied')) row.deployed = '✅';
-    if (message.includes('❌ Failed to transfer')) row.deployed = '❌';
+    if (message.includes('🚀 Uploading files') || message.includes('📂 Copying files')) row.deployed = 'process';
+    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied')) row.deployed = 'success';
+    if (message.includes('❌ Failed to transfer')) row.deployed = 'error';
 
     // Heartbeat
-    if (message.includes('💓 Checking heartbeat')) row.heartbeat = '💓';
-    if (message.includes('✅ Heartbeat OK')) row.heartbeat = '✅';
-    if (message.includes('⚠️ Heartbeat returned error')) row.heartbeat = '⚠️';
-    if (message.includes('❌ Heartbeat failed')) row.heartbeat = '❌';
+    if (message.includes('💓 Checking heartbeat')) row.heartbeat = 'process';
+    if (message.includes('✅ Heartbeat OK')) row.heartbeat = 'success';
+    if (message.includes('⚠️ Heartbeat returned error')) row.heartbeat = 'error';
+    if (message.includes('❌ Heartbeat failed')) row.heartbeat = 'error';
 
     if (level === 'ERROR') {
-        if (row.compiled === '🔄') row.compiled = '❌';
-        if (row.deployed === '🚀' || row.deployed === '⌛') row.deployed = '❌';
+        if (row.compiled === 'process' || row.compiled === 'pending') row.compiled = 'error';
+        if (row.deployed === 'process' || row.deployed === 'pending') row.deployed = 'error';
+        if (row.heartbeat === 'process' || row.heartbeat === 'pending') row.heartbeat = 'error';
     }
 
     progress[serviceId] = row;
     this.deploymentProgress.set(progress);
   }
+
+
 
   objectKeys(obj: any) { return Object.keys(obj); }
   getServiceName(id: string) { return this.services().find(s => s.id === id)?.name || 'Unknown'; }
