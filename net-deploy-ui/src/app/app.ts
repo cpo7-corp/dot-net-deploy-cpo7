@@ -13,12 +13,15 @@ export class App {
   private translate = inject(TranslateService);
 
   constructor() {
-    this.translate.addLangs(['en', 'he']);
+    this.translate.addLangs(['en', 'zh', 'hi', 'es', 'fr', 'ar', 'bn', 'pt', 'ru', 'ur', 'id', 'de', 'ja', 'sw', 'mr', 'te', 'tr', 'vi', 'ta', 'ko', 'he', 'nl', 'pl', 'sv', 'it', 'no', 'da', 'fi', 'uk', 'ro']);
+    const savedLang = localStorage.getItem('app_lang') || 'en';
     this.translate.setDefaultLang('en');
-    this.translate.use('en');
+    this.translate.use(savedLang);
 
     this.translate.onLangChange.subscribe(event => {
-      document.documentElement.dir = event.lang === 'he' ? 'rtl' : 'ltr';
+      localStorage.setItem('app_lang', event.lang);
+      const rtlLangs = ['he', 'ar', 'ur'];
+      document.documentElement.dir = rtlLangs.includes(event.lang) ? 'rtl' : 'ltr';
       document.documentElement.lang = event.lang;
     });
   }

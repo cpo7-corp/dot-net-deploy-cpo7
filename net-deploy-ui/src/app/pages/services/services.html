@@ -1,8 +1,8 @@
 <div class="container-fluid">
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="page-title mb-0">{{ 'SETTINGS.TAB_SERVICES' | translate }}</h1>
+    <h1 class="page-title mb-0">{{ 'services' | translate }}</h1>
     <button class="btn btn-primary px-4 shadow-sm" (click)="openAddModal()">
-      <i class="bi bi-plus-lg me-2"></i> {{ 'SETTINGS.ADD_SERVICE' | translate }}
+      <i class="bi bi-plus-lg me-2"></i> {{ 'addService' | translate }}
     </button>
   </div>
 
@@ -11,7 +11,7 @@
     <!-- Services Table List -->
     <div class="card bg-dark text-white border-secondary glass-panel shadow-sm">
       <div class="card-header border-secondary py-3">
-        <h5 class="mb-0">{{ 'SETTINGS.CONFIGURED_SERVICES' | translate }}</h5>
+        <h5 class="mb-0">{{ 'configuredServices' | translate }}</h5>
       </div>
       <div class="table-responsive">
         <table class="table table-dark table-hover mb-0 align-middle clickable-table">
@@ -89,7 +89,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered" style="position: relative; z-index: 1060;">
       <div class="modal-content bg-dark text-white border-secondary glass-panel shadow-lg">
         <div class="modal-header border-secondary">
-          <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>{{ 'SETTINGS.ADD_SERVICE' | translate }}</h5>
+          <h5 class="modal-title"><i class="bi bi-plus-circle me-2"></i>{{ 'addService' | translate }}</h5>
           <button type="button" class="btn-close btn-close-white" (click)="closeAddModal()"></button>
         </div>
         <div class="modal-body">

@@ -1,6 +1,6 @@
 <div class="container-fluid h-100">
   <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1 class="page-title mb-0">{{ 'DEPLOY.TITLE' | translate }}</h1>
+    <h1 class="page-title mb-0">{{ 'deployServices' | translate }}</h1>
 
     <div class="d-flex align-items-center gap-2">
       <label class="text-secondary small mb-0">Environment:</label>
@@ -19,7 +19,7 @@
     <div class="col-lg-5 col-xl-4 d-flex flex-column">
       <div class="card bg-dark text-white border-secondary glass-panel shadow-sm h-100 d-flex flex-column">
         <div class="card-header border-bottom border-secondary d-flex justify-content-between align-items-center py-3">
-          <h4 class="mb-0">{{ 'DEPLOY.SELECT_SERVICES' | translate }}</h4>
+          <h4 class="mb-0">{{ 'selectServices' | translate }}</h4>
           <div class="btn-group btn-group-sm">
             <button class="btn btn-outline-light" type="button" (click)="selectAll()">{{ 'DEPLOY.ALL' | translate
               }}</button>
@@ -32,14 +32,14 @@
           @if (loading()) {
           <div class="p-4 text-center text-secondary">
             <div class="spinner-border spinner-border-sm me-2" role="status"></div>
-            {{ 'DEPLOY.LOADING' | translate }}
+            {{ 'loadingServices' | translate }}
           </div>
           }
 
           @if (!loading()) {
           @if (services().length === 0) {
           <div class="p-4 text-center text-secondary">
-            {{ 'DEPLOY.NO_SERVICES' | translate }}
+            {{ 'noServices' | translate }}
           </div>
           }
 
@@ -55,8 +55,7 @@
                 </div>
                 <span class="badge"
                   [ngClass]="s.status === 'Running' ? 'bg-success' : (s.status === 'Stopped' ? 'bg-danger' : 'bg-secondary')">
-                  {{ s.status ? ('DASHBOARD.' + (s.status | uppercase) | translate) : ('DASHBOARD.UNKNOWN' | translate)
-                  }}
+                  {{ s.status ? (s.status | lowercase | translate) : ('unknown' | translate) }}
                 </span>
               </div>
 
@@ -84,7 +83,7 @@
                 [ngModel]="deployPull()" (ngModelChange)="deployPull.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkPull" style="cursor: pointer;"
                 [class.text-white]="deployPull()" [class.text-secondary]="!deployPull()">
-                <i class="bi bi-cloud-arrow-down me-1"></i> {{ 'DEPLOY.STRATEGY_PULL' | translate }}
+                <i class="bi bi-cloud-arrow-down me-1"></i> {{ 'strategyPull' | translate }}
               </label>
             </div>
 
@@ -93,7 +92,7 @@
                 [ngModel]="deployBuild()" (ngModelChange)="deployBuild.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkBuild" style="cursor: pointer;"
                 [class.text-white]="deployBuild()" [class.text-secondary]="!deployBuild()">
-                <i class="bi bi-hammer me-1"></i> {{ 'DEPLOY.STRATEGY_BUILD' | translate }}
+                <i class="bi bi-hammer me-1"></i> {{ 'strategyBuild' | translate }}
               </label>
             </div>
 
@@ -102,7 +101,7 @@
                 [ngModel]="deployTransfer()" (ngModelChange)="deployTransfer.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkDeploy" style="cursor: pointer;"
                 [class.text-white]="deployTransfer()" [class.text-secondary]="!deployTransfer()">
-                <i class="bi bi-rocket-takeoff me-1"></i> {{ 'DEPLOY.STRATEGY_TRANSFER' | translate }}
+                <i class="bi bi-rocket-takeoff me-1"></i> {{ 'strategyTransfer' | translate }}
               </label>
             </div>
           </div>
@@ -110,11 +109,11 @@
           <button class="btn btn-primary w-100 py-3 fs-5 fw-bold" (click)="startDeploy()"
             [disabled]="selectedServiceIds.size === 0 || deploying()">
             @if (!deploying()) {
-            <span>{{ 'DEPLOY.BTN_DEPLOY_SELECTED' | translate }} ({{selectedServiceIds.size}})</span>
+            <span>{{ 'deploySelected' | translate }} ({{selectedServiceIds.size}})</span>
             } @else {
             <span class="deploying-pulse">
               <div class="spinner-grow spinner-grow-sm me-2" role="status"></div>
-              {{ 'DEPLOY.DEPLOYING' | translate }}
+              {{ 'deploying' | translate }}
             </span>
             }
           </button>
@@ -123,10 +122,10 @@
           <div class="d-flex gap-2 mt-2">
             <button class="btn btn-warning flex-grow-1 py-2 fw-bold text-dark" (click)="togglePause()">
               <i class="bi" [class.bi-pause-fill]="!isPaused()" [class.bi-play-fill]="isPaused()"></i>
-              {{ (isPaused() ? 'DEPLOY.RESUME' : 'DEPLOY.PAUSE') | translate }}
+              {{ (isPaused() ? 'resume' : 'pause') | translate }}
             </button>
             <button class="btn btn-danger flex-grow-1 py-2 fw-bold" (click)="stopDeployment()">
-              <i class="bi bi-stop-fill"></i> {{ 'DEPLOY.STOP' | translate }}
+              <i class="bi bi-stop-fill"></i> {{ 'stop' | translate }}
             </button>
           </div>
           }
@@ -168,7 +167,7 @@
         <div class="card-body terminal-body" id="logContainer" style="height: 600px; overflow-y: auto;">
           @if (logs().length === 0) {
           <div class="h-100 d-flex align-items-center justify-content-center text-secondary fst-italic">
-            {{ 'DEPLOY.LOG_PLACEHOLDER' | translate }}
+            {{ 'logPlaceholder' | translate }}
           </div>
           }
 

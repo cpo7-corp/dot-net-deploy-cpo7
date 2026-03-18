@@ -1,5 +1,5 @@
 <div class="container-fluid">
-  <h1 class="page-title mb-4">{{ 'SETTINGS.TITLE' | translate }}</h1>
+  <h1 class="page-title mb-4">{{ 'configSettingsTitle' | translate }}</h1>
 
   @if (showLoading()) {
     <div class="text-info">Loading configurations...</div>
@@ -12,7 +12,7 @@
         <i class="bi bi-server me-2"></i> VPS
       </button>
       <button class="btn" [class.btn-primary]="activeTab() === 'database'" [class.btn-outline-secondary]="activeTab() !== 'database'" (click)="setTab('database')">
-        <i class="bi bi-database me-2"></i> {{ 'SETTINGS.DATABASE' | translate }}
+        <i class="bi bi-database me-2"></i> {{ 'database' | translate }}
       </button>
     </div>
 
@@ -22,15 +22,15 @@
       @if (activeTab() === 'git') {
         <div class="card bg-dark text-white border-secondary glass-panel shadow-sm p-4 mb-4">
           <h3 class="mb-4 d-flex align-items-center gap-2">
-            <i class="bi bi-git text-primary"></i> {{ 'SETTINGS.GIT_CONNECTION' | translate }}
+            <i class="bi bi-git text-primary"></i> {{ 'gitConnection' | translate }}
           </h3>
           <div class="row g-3">
             <div class="col-12">
-              <label class="form-label">{{ 'SETTINGS.GIT_TOKEN' | translate }}</label>
+              <label class="form-label">{{ 'gitToken' | translate }}</label>
               <input type="password" class="form-control bg-dark text-white border-secondary" [(ngModel)]="settings().git.token" name="g_token" placeholder="github_pat_...">
             </div>
             <div class="col-12">
-              <label class="form-label">{{ 'SETTINGS.LOCAL_CLONE_PATH' | translate }}</label>
+              <label class="form-label">{{ 'localBaseDir' | translate }}</label>
               <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="settings().git.localBaseDir" name="g_localBaseDir" required>
             </div>
           </div>
@@ -70,19 +70,19 @@
 
               @if (!vps.isLocal) {
                 <div class="col-md-9">
-                  <label class="form-label">{{ 'SETTINGS.HOST' | translate }}</label>
+                  <label class="form-label">{{ 'host' | translate }}</label>
                   <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.host" [name]="'v_host_' + $index" placeholder="1.2.3.4" required>
                 </div>
                 <div class="col-md-3">
-                  <label class="form-label">{{ 'SETTINGS.PORT' | translate }}</label>
+                  <label class="form-label">{{ 'port' | translate }}</label>
                   <input type="number" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.port" [name]="'v_port_' + $index" required>
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">{{ 'SETTINGS.USERNAME' | translate }}</label>
+                  <label class="form-label">{{ 'username' | translate }}</label>
                   <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.username" [name]="'v_username_' + $index" required>
                 </div>
                 <div class="col-md-6">
-                  <label class="form-label">{{ 'SETTINGS.PASSWORD' | translate }}</label>
+                  <label class="form-label">{{ 'password' | translate }}</label>
                   <input type="password" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.password" [name]="'v_password_' + $index">
                 </div>
               } @else {
@@ -164,28 +164,28 @@
       @if (activeTab() === 'database') {
         <div class="card bg-dark text-white border-secondary glass-panel shadow-sm p-4 mb-4">
           <h3 class="mb-4 d-flex align-items-center gap-2">
-            <i class="bi bi-database text-info"></i> {{ 'SETTINGS.DB_MAINTENANCE' | translate }}
+            <i class="bi bi-database text-info"></i> {{ 'dbMaintenance' | translate }}
           </h3>
           <p class="text-secondary mb-4">
-            {{ 'SETTINGS.DB_MAINTENANCE_DESC' | translate }}
+            {{ 'dbMaintenanceDesc' | translate }}
           </p>
 
           <div class="row g-4">
             <div class="col-md-6">
               <div class="p-4 border border-secondary rounded bg-black bg-opacity-25 h-100">
-                <h5><i class="bi bi-download me-2 text-success"></i> {{ 'SETTINGS.EXPORT_TITLE' | translate }}</h5>
-                <p class="small text-secondary">{{ 'SETTINGS.EXPORT_DESC' | translate }}</p>
+                <h5><i class="bi bi-download me-2 text-success"></i> {{ 'exportData' | translate }}</h5>
+                <p class="small text-secondary">{{ 'exportDesc' | translate }}</p>
                 <button type="button" class="btn btn-outline-success mt-2" (click)="exportDb()">
-                  <i class="bi bi-file-earmark-arrow-down me-2"></i> {{ 'SETTINGS.BTN_EXPORT' | translate }}
+                  <i class="bi bi-file-earmark-arrow-down me-2"></i> {{ 'exportAll' | translate }}
                 </button>
               </div>
             </div>
             <div class="col-md-6">
               <div class="p-4 border border-secondary rounded bg-black bg-opacity-25 h-100">
-                <h5><i class="bi bi-upload me-2 text-danger"></i> {{ 'SETTINGS.IMPORT_TITLE' | translate }}</h5>
-                <p class="small text-secondary">{{ 'SETTINGS.IMPORT_DESC' | translate }}</p>
+                <h5><i class="bi bi-upload me-2 text-danger"></i> {{ 'importData' | translate }}</h5>
+                <p class="small text-secondary">{{ 'importDesc' | translate }}</p>
                 <label class="btn btn-outline-danger mt-2">
-                  <i class="bi bi-file-earmark-arrow-up me-2"></i> {{ 'SETTINGS.BTN_IMPORT' | translate }}
+                  <i class="bi bi-file-earmark-arrow-up me-2"></i> {{ 'importFromFile' | translate }}
                   <input type="file" (change)="onImportDb($event)" accept=".json" hidden>
                 </label>
               </div>
@@ -197,10 +197,10 @@
       <!-- Footer Actions -->
       <div class="d-flex align-items-center gap-3 mt-4 mb-5">
         <button type="submit" class="btn btn-primary btn-lg px-5 shadow" [disabled]="saving()">
-          <i class="bi bi-save me-2"></i> {{ 'SETTINGS.BTN_SAVE_CHANGES' | translate }}
+          <i class="bi bi-save me-2"></i> {{ 'save' | translate }}
         </button>
         @if (successMsg()) {
-          <span class="text-success fw-bold animate-fade-in"><i class="bi bi-check2-circle me-1"></i> {{ 'SETTINGS.SAVED_SUCCESS' | translate }}</span>
+          <span class="text-success fw-bold animate-fade-in"><i class="bi bi-check2-circle me-1"></i> {{ 'savedSuccess' | translate }}</span>
         }
       </div>
     </form>
