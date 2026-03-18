@@ -56,7 +56,13 @@
     "BTN_DEPLOY_SELECTED": "בצע פריסה",
     "DEPLOYING": "מתחיל פריסה...",
     "TERMINAL_TITLE": "טרמינל הפריסה (Live Logs)",
-    "LOG_PLACEHOLDER": "בחר שירותים ולחץ על התחל פריסה כדי לראות את הפלט כאן."
+    "LOG_PLACEHOLDER": "בחר שירותים ולחץ על התחל פריסה כדי לראות את הפלט כאן.",
+    "STRATEGY_PULL": "משיכת קוד מ-Git",
+    "STRATEGY_BUILD": "בניית כל השירותים לפני פריסה",
+    "STRATEGY_TRANSFER": "העברה ופריסה לשרת",
+    "PAUSE": "השהייה",
+    "RESUME": "המשך",
+    "STOP": "עצירה"
   },
   "LOGS": {
     "TITLE": "היסטוריית פריסה",

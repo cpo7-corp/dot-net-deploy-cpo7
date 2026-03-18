@@ -84,7 +84,7 @@
                 [ngModel]="deployPull()" (ngModelChange)="deployPull.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkPull" style="cursor: pointer;"
                 [class.text-white]="deployPull()" [class.text-secondary]="!deployPull()">
-                <i class="bi bi-cloud-arrow-down me-1"></i> pull code from git
+                <i class="bi bi-cloud-arrow-down me-1"></i> {{ 'DEPLOY.STRATEGY_PULL' | translate }}
               </label>
             </div>
 
@@ -93,7 +93,7 @@
                 [ngModel]="deployBuild()" (ngModelChange)="deployBuild.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkBuild" style="cursor: pointer;"
                 [class.text-white]="deployBuild()" [class.text-secondary]="!deployBuild()">
-                <i class="bi bi-hammer me-1"></i> build code
+                <i class="bi bi-hammer me-1"></i> {{ 'DEPLOY.STRATEGY_BUILD' | translate }}
               </label>
             </div>
 
@@ -102,7 +102,7 @@
                 [ngModel]="deployTransfer()" (ngModelChange)="deployTransfer.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkDeploy" style="cursor: pointer;"
                 [class.text-white]="deployTransfer()" [class.text-secondary]="!deployTransfer()">
-                <i class="bi bi-rocket-takeoff me-1"></i> Transfer and Deploy to server
+                <i class="bi bi-rocket-takeoff me-1"></i> {{ 'DEPLOY.STRATEGY_TRANSFER' | translate }}
               </label>
             </div>
           </div>
@@ -123,10 +123,10 @@
           <div class="d-flex gap-2 mt-2">
             <button class="btn btn-warning flex-grow-1 py-2 fw-bold text-dark" (click)="togglePause()">
               <i class="bi" [class.bi-pause-fill]="!isPaused()" [class.bi-play-fill]="isPaused()"></i>
-              {{ isPaused() ? 'Resume' : 'Pause' }}
+              {{ (isPaused() ? 'DEPLOY.RESUME' : 'DEPLOY.PAUSE') | translate }}
             </button>
             <button class="btn btn-danger flex-grow-1 py-2 fw-bold" (click)="stopDeployment()">
-              <i class="bi bi-stop-fill"></i> Stop
+              <i class="bi bi-stop-fill"></i> {{ 'DEPLOY.STOP' | translate }}
             </button>
           </div>
           }
