@@ -11,6 +11,9 @@
       <button class="btn" [class.btn-primary]="activeTab() === 'vps'" [class.btn-outline-secondary]="activeTab() !== 'vps'" (click)="setTab('vps')">
         <i class="bi bi-server me-2"></i> VPS
       </button>
+      <button class="btn" [class.btn-primary]="activeTab() === 'database'" [class.btn-outline-secondary]="activeTab() !== 'database'" (click)="setTab('database')">
+        <i class="bi bi-database me-2"></i> {{ 'SETTINGS.DATABASE' | translate }}
+      </button>
     </div>
 
     <form (ngSubmit)="saveGlobalSettings()">
@@ -155,6 +158,40 @@
             No VPS environments added yet. Click "Add Environment" to get started.
           </div>
         }
+      }
+
+      <!-- Database Tab -->
+      @if (activeTab() === 'database') {
+        <div class="card bg-dark text-white border-secondary glass-panel shadow-sm p-4 mb-4">
+          <h3 class="mb-4 d-flex align-items-center gap-2">
+            <i class="bi bi-database text-info"></i> {{ 'SETTINGS.DB_MAINTENANCE' | translate }}
+          </h3>
+          <p class="text-secondary mb-4">
+            {{ 'SETTINGS.DB_MAINTENANCE_DESC' | translate }}
+          </p>
+
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div class="p-4 border border-secondary rounded bg-black bg-opacity-25 h-100">
+                <h5><i class="bi bi-download me-2 text-success"></i> {{ 'SETTINGS.EXPORT_TITLE' | translate }}</h5>
+                <p class="small text-secondary">{{ 'SETTINGS.EXPORT_DESC' | translate }}</p>
+                <button type="button" class="btn btn-outline-success mt-2" (click)="exportDb()">
+                  <i class="bi bi-file-earmark-arrow-down me-2"></i> {{ 'SETTINGS.BTN_EXPORT' | translate }}
+                </button>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="p-4 border border-secondary rounded bg-black bg-opacity-25 h-100">
+                <h5><i class="bi bi-upload me-2 text-danger"></i> {{ 'SETTINGS.IMPORT_TITLE' | translate }}</h5>
+                <p class="small text-secondary">{{ 'SETTINGS.IMPORT_DESC' | translate }}</p>
+                <label class="btn btn-outline-danger mt-2">
+                  <i class="bi bi-file-earmark-arrow-up me-2"></i> {{ 'SETTINGS.BTN_IMPORT' | translate }}
+                  <input type="file" (change)="onImportDb($event)" accept=".json" hidden>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
       }
 
       <!-- Footer Actions -->

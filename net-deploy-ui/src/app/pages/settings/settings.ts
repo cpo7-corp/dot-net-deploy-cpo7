@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
 import { SettingsService } from '../../services/settings.service';
 import { AppSettings, VpsSettings } from '../../models/api-models';
+import { MaintenanceService } from '../../services/maintenance.service';
 
 @Component({
   selector: 'app-settings',
@@ -14,8 +15,9 @@ import { AppSettings, VpsSettings } from '../../models/api-models';
 })
 export class SettingsComponent implements OnInit {
   private settingsSvc = inject(SettingsService);
+  private maintenanceSvc = inject(MaintenanceService);
 
-  activeTab = signal<'git' | 'vps'>('git');
+  activeTab = signal<'git' | 'vps' | 'database'>('git');
   settings = signal<AppSettings>({
     git: { token: '', localBaseDir: 'C:\\deploy-temp' },
     vpsEnvironments: []
@@ -37,7 +39,7 @@ export class SettingsComponent implements OnInit {
     });
   }
 
-  setTab(tab: 'git' | 'vps') {
+  setTab(tab: 'git' | 'vps' | 'database') {
     this.activeTab.set(tab);
   }
 
@@ -97,5 +99,44 @@ export class SettingsComponent implements OnInit {
       },
       error: () => this.saving.set(false)
     });
+  }
+
+  exportDb() {
+    this.maintenanceSvc.exportDatabase().subscribe(data => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `net-deploy-settings-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    });
+  }
+
+  onImportDb(event: any) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e: any) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (confirm('Are you sure? This will replace ALL existing settings, services and environment configurations!')) {
+          this.maintenanceSvc.importDatabase(data).subscribe({
+            next: () => {
+              alert('Imported successfully! The page will now reload.');
+              window.location.reload();
+            },
+            error: (err) => {
+              alert('Import failed: ' + (err.error?.message || err.message));
+            }
+          });
+        }
+      } catch (err) {
+        alert('Invalid JSON file.');
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
   }
 }

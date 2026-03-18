@@ -42,6 +42,7 @@ builder.Services.AddSingleton<ServicesLogic>();
 builder.Services.AddSingleton<DeployLogsLogic>();
 builder.Services.AddSingleton<GitLogic>();
 builder.Services.AddSingleton<EnvConfigsLogic>();
+builder.Services.AddSingleton<NET.Deploy.Api.Logic.Maintenance.MaintenanceLogic>();
 
 // Deploy dependencies
 builder.Services.AddSingleton<ProcessRunner>();

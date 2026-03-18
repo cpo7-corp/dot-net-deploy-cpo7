@@ -23,7 +23,7 @@
       "WebApi": ".NET Web API",
       "Mvc": ".NET MVC Site",
       "WindowsService": "Windows Service",
-      "Angular": "Angular SPA",
+      "Angular": "Angular App",
       "React": "React App"
     }
   },
@@ -58,7 +58,16 @@
     "VPS_DEPLOY_PATH": "VPS Deploy Path",
     "BTN_SAVE_CHANGES": "Save",
     "BTN_DELETE": "Delete",
-    "SAVED_SUCCESS": "Saved successfully!"
+    "SAVED_SUCCESS": "Saved successfully!",
+    "DATABASE": "Database",
+    "DB_MAINTENANCE": "Database Maintenance",
+    "DB_MAINTENANCE_DESC": "Export or import all system settings, services, and environment configurations into a single JSON file.",
+    "EXPORT_TITLE": "Export Data",
+    "EXPORT_DESC": "Download a backup file containing all information from the database.",
+    "BTN_EXPORT": "Export All Settings",
+    "IMPORT_TITLE": "Import Data",
+    "IMPORT_DESC": "Upload a previously exported JSON file to restore all settings. Warning: This action overwrites existing data!",
+    "BTN_IMPORT": "Import from File"
   },
   "DEPLOY": {
     "TITLE": "Deploy Services",
