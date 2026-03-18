@@ -1,8 +1,9 @@
 using Microsoft.Extensions.Logging;
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.Services;
@@ -23,7 +24,13 @@ public class DeployLogic(
     ProcessRunner processRunner,
     EnvConfigsLogic envConfigsLogic)
 {
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _repoLocks = new();
+    private SemaphoreSlim GetRepoLock(string path) => _repoLocks.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
+
+    public (string RepoUrl, string Branch, string ProjectPath) ParseGitUrl(string fullUrl) => gitLogic.ParseGitUrl(fullUrl);
+
     public async Task<bool> PrepAndBuildServiceAsync(
+
         ServiceDefinitionDB service,
         AppSettingsDB settings,
         LogCallback log,
@@ -53,33 +60,45 @@ public class DeployLogic(
         var effectiveBranch = GetEffectiveBranch(service, envConfig, gitBranch, branchOverride);
         var effectiveProjectPath = NormalizePath(GetEffectiveProjectPath(service, projectPath));
 
-        if (!skipPull)
-        {
-            await log("INFO", $"📥 [Prep] Pulling latest for {service.Name} ({effectiveBranch})...", service.Id);
-            if (!await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean))
-                return false;
-        }
-
         var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl, effectiveProjectPath);
         var projectFullPath = Path.Combine(repoLocalPath, effectiveProjectPath);
 
-        if (Directory.Exists(publishOutput))
+        // LOCK START: Ensure only one service works on this repository folder at a time
+        var @lock = GetRepoLock(repoLocalPath);
+        await @lock.WaitAsync();
+
+        try
         {
-            try { FileHelper.DeleteDirectoryRecursively(publishOutput); } catch { }
+            if (!skipPull)
+            {
+                await log("INFO", $"📥 [Prep] Pulling latest for {service.Name} ({effectiveBranch})...", service.Id);
+                if (!await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean))
+                    return false;
+            }
+
+            if (Directory.Exists(publishOutput))
+            {
+                try { FileHelper.DeleteDirectoryRecursively(publishOutput); } catch { }
+            }
+
+            await log("INFO", $"🔨 [Prep] Building & publishing {service.Name}...", service.Id);
+            bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, service.Id);
+
+            if (buildSuccess)
+            {
+                var vps = settings.VpsEnvironments.FirstOrDefault(e => e.Id == environmentId);
+                await ApplyEnvironmentConfigsAsync(envConfig, vps, publishOutput, log, service.Id);
+                await log("SUCCESS", $"✅ [Prep] Prepared and configured: {service.Name}", service.Id);
+            }
+
+            return buildSuccess;
         }
-
-        await log("INFO", $"🔨 [Prep] Building & publishing {service.Name}...", service.Id);
-        bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, service.Id);
-
-        if (buildSuccess)
+        finally
         {
-            var vps = settings.VpsEnvironments.FirstOrDefault(e => e.Id == environmentId);
-            await ApplyEnvironmentConfigsAsync(envConfig, vps, publishOutput, log, service.Id);
-            await log("SUCCESS", $"✅ [Prep] Prepared and configured: {service.Name}", service.Id);
+            @lock.Release();
         }
-
-        return buildSuccess;
     }
+
 
     public async Task<bool> PerformServiceActionAsync(ServiceDefinitionDB service, string environmentId, string action, AppSettingsDB settings, LogCallback log)
     {

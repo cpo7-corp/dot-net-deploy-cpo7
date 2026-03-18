@@ -1,10 +1,15 @@
 using NET.Deploy.Api.Logic.Settings.Entities;
 using System.Diagnostics;
+using System.Collections.Concurrent;
+using System.Threading;
 
 namespace NET.Deploy.Api.Logic.Git;
 
 public class GitLogic(ILogger<GitLogic> logger)
 {
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _repoLocks = new();
+    private static SemaphoreSlim GetRepoLock(string path) => _repoLocks.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
+
     /// <summary>
     /// Clones the repo if it does not exist locally, otherwise pulls latest changes.
     /// </summary>
@@ -12,64 +17,75 @@ public class GitLogic(ILogger<GitLogic> logger)
     {
         var repoDirName = GetSafeRepoName(repoUrl);
         var repoPath = Path.Combine(git.LocalBaseDir, repoDirName);
-        var authUrl = BuildAuthUrl(git, repoUrl);
+        
+        var @lock = GetRepoLock(repoPath);
+        await @lock.WaitAsync();
 
-        // 1. Force Clean Logic
-        if (Directory.Exists(repoPath) && forceClean)
+        try
         {
-            try
-            {
-                if (log != null) await log("INFO", $"🧹 [Clean] Deleting existing directory to ensure fresh clone...");
-                DeleteDirectoryRecursively(repoPath);
-            }
-            catch (Exception ex)
-            {
-                if (log != null) await log("WARNING", $"Could not fully clear folder (files might be in use): {ex.Message}");
-                // If we can't clear it but want a fresh clone, we have a problem. 
-                // However, we'll try to let git handle it or fail later.
-            }
-        }
+            var authUrl = BuildAuthUrl(git, repoUrl);
 
-        // 2. Clone/Sparse-Checkout Logic (if .git is missing)
-        if (!Directory.Exists(Path.Combine(repoPath, ".git")))
-        {
-            if (Directory.Exists(repoPath))
+            // 1. Force Clean Logic
+            if (Directory.Exists(repoPath) && forceClean)
             {
                 try
                 {
+                    if (log != null) await log("INFO", $"🧹 [Clean] Deleting existing directory to ensure fresh clone...");
                     DeleteDirectoryRecursively(repoPath);
                 }
                 catch (Exception ex)
                 {
-                    if (log != null) await log("ERROR", "❌ Cannot clone: Target folder exists and is not a git repo, and cannot be deleted. Try manual cleanup.");
-                    return false;
+                    if (log != null) await log("WARNING", $"Could not fully clear folder (files might be in use): {ex.Message}");
+                    // If we can't clear it but want a fresh clone, we have a problem. 
+                    // However, we'll try to let git handle it or fail later.
                 }
             }
 
-            logger.LogInformation("Cloning repo {Url} into {Path}", repoUrl, repoPath);
-            if (log != null) await log("INFO", $"📥 Starting fresh clone (branch: {branch})...");
-            Directory.CreateDirectory(repoPath);
+            // 2. Clone/Sparse-Checkout Logic (if .git is missing)
+            if (!Directory.Exists(Path.Combine(repoPath, ".git")))
+            {
+                if (Directory.Exists(repoPath))
+                {
+                    try
+                    {
+                        DeleteDirectoryRecursively(repoPath);
+                    }
+                    catch (Exception ex)
+                    {
+                        if (log != null) await log("ERROR", "❌ Cannot clone: Target folder exists and is not a git repo, and cannot be deleted. Try manual cleanup.");
+                        return false;
+                    }
+                }
 
-            var cloneArgs = $"clone -b {branch} {authUrl} .";
+                logger.LogInformation("Cloning repo {Url} into {Path}", repoUrl, repoPath);
+                if (log != null) await log("INFO", $"📥 Starting fresh clone (branch: {branch})...");
+                Directory.CreateDirectory(repoPath);
 
-            if (!await RunGitAsync(repoPath, cloneArgs, "Cloning", log))
+                var cloneArgs = $"clone -b {branch} {authUrl} .";
+
+                if (!await RunGitAsync(repoPath, cloneArgs, "Cloning", log))
+                    return false;
+
+                return true;
+            }
+
+            // 3. Incremental Update Logic
+            logger.LogInformation("Updating existing repo from branch {Branch} in {Repo}", branch, repoUrl);
+            if (log != null) await log("INFO", $"♻️ Updating existing repo (incremental pull)...");
+
+            // Clean any local locks/index issues if they exist
+            var lockFile = Path.Combine(repoPath, ".git", "index.lock");
+            if (File.Exists(lockFile)) File.Delete(lockFile);
+
+            if (!await RunGitAsync(repoPath, "fetch --all", "Fetch", log))
                 return false;
 
-            return true;
+            return await RunGitAsync(repoPath, $"reset --hard origin/{branch}", "Reset", log);
         }
-
-        // 3. Incremental Update Logic
-        logger.LogInformation("Updating existing repo from branch {Branch} in {Repo}", branch, repoUrl);
-        if (log != null) await log("INFO", $"♻️ Updating existing repo (incremental pull)...");
-
-        // Clean any local locks/index issues if they exist
-        var lockFile = Path.Combine(repoPath, ".git", "index.lock");
-        if (File.Exists(lockFile)) File.Delete(lockFile);
-
-        if (!await RunGitAsync(repoPath, "fetch --all", "Fetch", log))
-            return false;
-
-        return await RunGitAsync(repoPath, $"reset --hard origin/{branch}", "Reset", log);
+        finally
+        {
+            @lock.Release();
+        }
     }
 
     private void DeleteDirectoryRecursively(string path)

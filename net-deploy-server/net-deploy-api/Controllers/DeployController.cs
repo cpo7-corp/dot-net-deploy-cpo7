@@ -72,9 +72,12 @@ public class DeployController(
                           ?? settings.VpsEnvironments.FirstOrDefault()
                           ?? new VpsSettings();
 
-        // A session-level dictionary to store repository preparation tasks.
-        // This ensures that for every (ServiceId, Branch) combination, we ONLY build once per request.
-        var servicePrepTasks = new System.Collections.Concurrent.ConcurrentDictionary<string, Task<bool>>();
+        // Shared across all services in this request.
+        // Ensures each repository is pulled/cloned ONLY once per session.
+        var repoUpdateTasks = new ConcurrentDictionary<string, Task<bool>>();
+
+        // Tracks build/config status for each specific service.
+        var servicePrepTasks = new ConcurrentDictionary<string, Task<bool>>();
 
         // Helper to get or start a prep task for a specific service's repository + build
         Task<bool> EnsureServicePrepared(ServiceDefinitionDB srv, string? branchOverride)
@@ -84,10 +87,25 @@ public class DeployController(
             var branchKey = branchOverride ?? defaultBranch;
             var prepKey = $"{srv.Id}|{branchKey}";
 
-            return servicePrepTasks.GetOrAdd(prepKey, _ => 
-                deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: false, request.SkipBuildIfOutputExists)
-            );
+            return servicePrepTasks.GetOrAdd(prepKey, async _ => 
+            {
+                var (repoUrl, gitBranch, _) = deployLogic.ParseGitUrl(srv.RepoUrl);
+                var effectiveRepoBranch = branchOverride ?? (string.IsNullOrWhiteSpace(envCfg?.DefaultBranch) ? gitBranch : envCfg.DefaultBranch);
+                var repoKey = $"{repoUrl}|{effectiveRepoBranch}";
+
+                // Ensure the repo is updated exactly once in this session.
+                // Subsequent services using the same repo/branch will skip the pull phase.
+                var repoUpdated = await repoUpdateTasks.GetOrAdd(repoKey, _ => 
+                    deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean)
+                );
+
+                if (!repoUpdated) return false;
+
+                // Now build specifically this service (skipping pull, but using the already-pulled/cloned folder)
+                return await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, request.SkipBuildIfOutputExists);
+            });
         }
+
 
         // PHASE 1: Full Preparation (Clone + Build + Config all first)
         if (request.CloneAllFirst)

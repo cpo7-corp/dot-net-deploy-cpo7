@@ -59,7 +59,11 @@
         },
         "serve": {
           "builder": "@angular/build:dev-server",
+          "options": {
+            "port": 5432
+          },
           "configurations": {
+
             "production": {
               "buildTarget": "net-deploy-ui:build:production"
             },
