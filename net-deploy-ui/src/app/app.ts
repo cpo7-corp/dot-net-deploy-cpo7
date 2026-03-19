@@ -33,4 +33,19 @@ export class App {
   setLanguage(lang: string) {
     this.translate.use(lang);
   }
+
+  showCommercialModal = false;
+
+  showLicenseNotice() {
+    this.showCommercialModal = true;
+  }
+
+  closeModal() {
+    this.showCommercialModal = false;
+  }
+
+  viewLicense() {
+    window.open('https://github.com/cpo7-corp/dot-net-deploy-cpo7/blob/main/LICENSE.md', '_blank');
+    this.closeModal();
+  }
 }

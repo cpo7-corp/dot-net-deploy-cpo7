@@ -154,5 +154,7 @@
   "noVpsEnvironmentsMsg": "לא נוספו סביבות VPS עדיין. לחץ עלי 'הוסף סביבה' כדי להתחיל.",
   "session": "סשן",
   "success": "הצלחה",
-  "loadingMore": "טוען עוד..."
+  "loadingMore": "טוען עוד...",
+  "commercialUseNotice": "התוכנה לשימוש לימודי בלבד. שימוש מסחרי מחייב רישיון בתשלום.",
+  "viewLicense": "צפה ברישיון"
 }

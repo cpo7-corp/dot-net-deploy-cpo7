@@ -154,5 +154,7 @@
   "noVpsEnvironmentsMsg": "No VPS environments added yet. Click \"Add Environment\" to get started.",
   "session": "Session",
   "success": "Success",
-  "loadingMore": "Loading more..."
+  "loadingMore": "Loading more...",
+  "commercialUseNotice": "This software is for educational use only. Paid license is required for commercial use.",
+  "viewLicense": "View License"
 }

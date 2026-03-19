@@ -18,6 +18,7 @@ NET Deploy is a powerful tool designed to automate the process of pulling, build
 - **IIS & Windows Services Support**: Automatic management of IIS sites and Windows Services.
 - **Live Terminal Logs**: Real-time feedback during the deployment process.
 - **Heartbeat Monitoring**: Automatic health checks after deployment.
+- **Environment Variables Support**: Manage and update application settings during deployment.
 - **Batch Operations**: Prepare all repositories before starting transfers.
 
 ## Getting Started
@@ -41,6 +42,7 @@ NET Deploy is a powerful tool designed to automate the process of pulling, build
 
 - **[Git](https://git-scm.com/download/win)** *(Required)* — Used to clone and pull repositories. Must be installed on the server.
 - **.NET 10.0+ Runtime** — Required to run the API server. [Download](https://dotnet.microsoft.com/download)
+- **[MongoDB](https://www.mongodb.com/try/download/community)** *(Required)* — Used to store system configurations and deployment logs.
 - **Node.js + npm** *(Optional)* — Required only if deploying Angular/React projects. [Download](https://nodejs.org)
 - **SSH/SFTP access** *(Optional)* — Required only when deploying to a remote VPS.
 
