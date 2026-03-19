@@ -7,7 +7,7 @@ namespace NET.Deploy.Api.Logic.Services;
 public class ServicesLogic(MongoDbContext db)
 {
     public async Task<List<ServiceDefinitionDB>> GetAllAsync() =>
-        await db.Services.Find(_ => true).ToListAsync();
+        await db.Services.Find(_ => true).SortBy(s => s.Order).ToListAsync();
 
     public async Task<ServiceDefinitionDB?> GetByIdAsync(string id) =>
         await db.Services.Find(Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id))).FirstOrDefaultAsync();
@@ -70,5 +70,15 @@ public class ServicesLogic(MongoDbContext db)
         await db.Services.UpdateOneAsync(
             Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)),
             update);
+    }
+    public async Task UpdateOrderAsync(List<string> ids)
+    {
+        for (int i = 0; i < ids.Count; i++)
+        {
+            var update = Builders<ServiceDefinitionDB>.Update.Set(s => s.Order, i);
+            await db.Services.UpdateOneAsync(
+                Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(ids[i])),
+                update);
+        }
     }
 }

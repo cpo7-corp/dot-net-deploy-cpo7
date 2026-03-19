@@ -65,3 +65,46 @@
   }
 }
 
+.drag-handle {
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  &:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.cdk-drag-preview {
+  box-sizing: border-box;
+  border-radius: 4px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+  background: #2a2a2a;
+  display: table;
+  width: 100%;
+  opacity: 0.9;
+  td {
+    padding: 0.75rem;
+    color: white;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+}
+
+.cdk-drag-placeholder {
+  opacity: 0;
+}
+
+.cdk-drag-animating {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.drag-row.cdk-drop-list-dragging tr:not(.cdk-drag-placeholder) {
+  transition: transform 250ms cubic-bezier(0, 0, 0.2, 1);
+}
+

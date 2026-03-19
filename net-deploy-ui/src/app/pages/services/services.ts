@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { TranslateModule } from '@ngx-translate/core';
+import { CdkDragDrop, moveItemInArray, CdkDropList, CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { ServicesMonitorService } from '../../services/services-monitor.service';
 import { SettingsService } from '../../services/settings.service';
 import { EnvConfigsService } from '../../services/env-configs.service';
@@ -12,7 +13,7 @@ import { ServiceStatus, ServiceDefinition, ServiceEnvironmentConfig, VpsSettings
 @Component({
   selector: 'app-services',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule],
+  imports: [CommonModule, FormsModule, TranslateModule, CdkDropList, CdkDrag, CdkDragHandle],
   templateUrl: './services.html',
   styleUrl: './services.less'
 })
@@ -213,6 +214,15 @@ export class ServicesComponent implements OnInit {
         this.loadData();
       }
     });
+  }
+
+  onDrop(event: CdkDragDrop<ServiceStatus[]>) {
+    const servicesArray = [...this.services()];
+    moveItemInArray(servicesArray, event.previousIndex, event.currentIndex);
+    this.services.set(servicesArray);
+
+    const ids = servicesArray.map(s => s.id!).filter(id => !!id);
+    this.servicesSvc.reorder(ids).subscribe();
   }
 
   private resetNewService(): Partial<ServiceDefinition> {

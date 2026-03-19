@@ -23,4 +23,8 @@ export class ServicesMonitorService extends ApiService {
   delete(id: string): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/services/${id}`);
   }
+
+  reorder(ids: string[]): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/services/reorder`, ids);
+  }
 }

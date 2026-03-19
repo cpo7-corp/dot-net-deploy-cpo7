@@ -17,7 +17,8 @@
         <table class="table table-dark table-hover mb-0 align-middle clickable-table">
           <thead>
             <tr class="text-secondary small">
-              <th class="ps-4">{{ 'name' | translate }}</th>
+              <th style="width: 40px;"></th>
+              <th class="ps-2">{{ 'name' | translate }}</th>
               <th>{{ 'type' | translate }}</th>
               <th>{{ 'lastDeploy' | translate }}</th>
               <th>{{ 'status' | translate }}</th>
@@ -35,21 +36,26 @@
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody cdkDropList (cdkDropListDropped)="onDrop($event)">
             @if (loading()) {
-              <tr><td colspan="6" class="text-center py-5">
+              <tr><td colspan="7" class="text-center py-5">
                 <div class="spinner-border spinner-border-sm text-primary me-2"></div>
                 {{ 'loadingServices' | translate }}
               </td></tr>
             } @else if (services().length === 0) {
-              <tr><td colspan="6" class="text-center py-5 text-secondary">
+              <tr><td colspan="7" class="text-center py-5 text-secondary">
                 {{ 'noServices' | translate }}
               </td></tr>
             }
             
             @for (s of services(); track s.id) {
-              <tr>
-                <td class="ps-4 fw-bold text-white" style="cursor: pointer;" (click)="openEditModal(s)">{{s.name}}</td>
+              <tr cdkDrag class="drag-row">
+                <td class="ps-3">
+                  <div class="drag-handle" cdkDragHandle>
+                    <i class="bi bi-grip-vertical opacity-50"></i>
+                  </div>
+                </td>
+                <td class="ps-2 fw-bold text-white" style="cursor: pointer;" (click)="openEditModal(s)">{{s.name}}</td>
                 <td><span class="badge bg-secondary opacity-75">{{s.serviceType}}</span></td>
                 <td>
                   @if (!s.lastDeployed) {

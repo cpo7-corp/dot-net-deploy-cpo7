@@ -40,6 +40,7 @@ export interface ServiceDefinition {
   compileSingleFile: boolean;
   lastDeployed?: string | Date;
   environments: ServiceEnvironmentConfig[];
+  order?: number;
   _saved?: boolean; // UI state only
 }
 

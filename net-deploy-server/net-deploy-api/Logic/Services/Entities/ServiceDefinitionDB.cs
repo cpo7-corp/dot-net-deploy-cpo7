@@ -27,6 +27,8 @@ public class ServiceDefinitionDB
     public List<ServiceEnvironmentConfigDB> Environments { get; set; } = new();
 
     public DateTime? LastDeployed { get; set; }
+    
+    public int Order { get; set; }
 }
 
 [BsonIgnoreExtraElements]

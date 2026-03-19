@@ -60,4 +60,11 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
         var deleted = await servicesLogic.DeleteAsync(id);
         return deleted ? NoContent() : NotFound();
     }
+
+    [HttpPost("reorder")]
+    public async Task<IActionResult> Reorder([FromBody] List<string> ids)
+    {
+        await servicesLogic.UpdateOrderAsync(ids);
+        return Ok();
+    }
 }
