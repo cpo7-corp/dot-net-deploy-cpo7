@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using NET.Deploy.Api.Logic.IIS;
 using NET.Deploy.Api.Logic.Services;
 using NET.Deploy.Api.Logic.Services.Entities;
+using System.Net;
 
 namespace NET.Deploy.Api.Controllers;
 
@@ -25,6 +26,7 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
             {
                 Id = s.Id!,
                 Name = s.Name,
+                Group = s.Group,
                 ServiceType = s.ServiceType,
                 IisSiteName = s.IisSiteName,
                 RepoUrl = s.RepoUrl,
@@ -37,6 +39,17 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
         }));
 
         return Ok(statuses);
+    }
+
+    [HttpGet("heartbeats")]
+    public async Task<ActionResult<List<ServiceHeartbeatStatus>>> GetHeartbeats([FromQuery] string environmentId)
+    {
+        if (string.IsNullOrWhiteSpace(environmentId))
+            return BadRequest("environmentId is required.");
+
+        var services = await servicesLogic.GetAllAsync();
+        var results = await Task.WhenAll(services.Select(s => CheckHeartbeatAsync(s, environmentId)));
+        return Ok(results.Where(r => !string.IsNullOrWhiteSpace(r.ServiceId)).ToList());
     }
 
     [HttpPost]
@@ -66,5 +79,42 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
     {
         await servicesLogic.UpdateOrderAsync(ids);
         return Ok();
+    }
+
+    private static async Task<ServiceHeartbeatStatus> CheckHeartbeatAsync(ServiceDefinitionDB service, string environmentId)
+    {
+        var envConfig = service.Environments.FirstOrDefault(e => e.EnvironmentId == environmentId);
+        var heartbeatUrl = envConfig?.HeartbeatUrl?.Trim();
+
+        if (string.IsNullOrWhiteSpace(service.Id) || string.IsNullOrWhiteSpace(heartbeatUrl))
+        {
+            return new ServiceHeartbeatStatus
+            {
+                ServiceId = service.Id ?? string.Empty,
+                Status = "Unknown"
+            };
+        }
+
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            using var response = await client.GetAsync(heartbeatUrl);
+
+            return new ServiceHeartbeatStatus
+            {
+                ServiceId = service.Id,
+                Status = response.IsSuccessStatusCode ? "Running" : "Stopped",
+                HttpStatusCode = (int)response.StatusCode
+            };
+        }
+        catch
+        {
+            return new ServiceHeartbeatStatus
+            {
+                ServiceId = service.Id,
+                Status = "Stopped",
+                HttpStatusCode = (int)HttpStatusCode.ServiceUnavailable
+            };
+        }
     }
 }

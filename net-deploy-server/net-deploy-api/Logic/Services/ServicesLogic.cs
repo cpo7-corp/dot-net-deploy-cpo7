@@ -34,6 +34,7 @@ public class ServicesLogic(MongoDbContext db)
     private void Prepare(ServiceDefinitionDB service)
     {
         service.Name = service.Name?.Trim() ?? string.Empty;
+        service.Group = service.Group?.Trim() ?? string.Empty;
         service.RepoUrl = service.RepoUrl?.Trim() ?? string.Empty;
         service.ProjectPath = service.ProjectPath?.Trim() ?? string.Empty;
         service.IisSiteName = service.IisSiteName?.Trim() ?? string.Empty;

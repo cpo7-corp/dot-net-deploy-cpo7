@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { ApiService } from './api.service';
-import { ServiceDefinition, ServiceStatus } from '../models/api-models';
+import { ServiceDefinition, ServiceHeartbeatStatus, ServiceStatus } from '../models/api-models';
 import { Observable } from 'rxjs';
 
 @Injectable({
@@ -10,6 +10,12 @@ export class ServicesMonitorService extends ApiService {
 
   getAll(): Observable<ServiceStatus[]> {
     return this.http.get<ServiceStatus[]>(`${this.baseUrl}/services`);
+  }
+
+  getHeartbeats(environmentId: string): Observable<ServiceHeartbeatStatus[]> {
+    return this.http.get<ServiceHeartbeatStatus[]>(`${this.baseUrl}/services/heartbeats`, {
+      params: { environmentId }
+    });
   }
 
   create(service: ServiceDefinition): Observable<ServiceDefinition> {

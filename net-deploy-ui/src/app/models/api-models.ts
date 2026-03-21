@@ -33,6 +33,7 @@ export interface EnvConfigSet {
 export interface ServiceDefinition {
   id?: string;
   name: string;
+  group: string;
   repoUrl: string;
   projectPath: string;
   iisSiteName: string;
@@ -66,6 +67,12 @@ export interface ServiceStatus extends ServiceDefinition {
   status: 'Running' | 'Stopped' | 'Error' | 'Unknown';
   isChecking?: boolean;
   hbStatus?: 'Running' | 'Stopped' | 'Unknown' | 'Checking';
+}
+
+export interface ServiceHeartbeatStatus {
+  serviceId: string;
+  status: 'Running' | 'Stopped' | 'Unknown';
+  httpStatusCode?: number | null;
 }
 
 export interface DeployLogEntry {

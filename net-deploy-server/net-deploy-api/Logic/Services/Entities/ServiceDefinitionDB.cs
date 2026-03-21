@@ -12,6 +12,8 @@ public class ServiceDefinitionDB
 
     public string Name { get; set; } = string.Empty;
 
+    public string Group { get; set; } = string.Empty;
+
     public string RepoUrl { get; set; } = string.Empty;
 
     /// <summary>Relative path to the .csproj inside the cloned repo</summary>

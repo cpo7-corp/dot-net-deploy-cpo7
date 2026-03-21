@@ -1,9 +1,7 @@
 import { Component, inject, OnInit, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { TranslateModule } from '@ngx-translate/core';
-import { CdkDragDrop, moveItemInArray, CdkDropList, CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { ServicesMonitorService } from '../../services/services-monitor.service';
 import { SettingsService } from '../../services/settings.service';
 import { EnvConfigsService } from '../../services/env-configs.service';
@@ -13,7 +11,7 @@ import { ServiceStatus, ServiceDefinition, ServiceEnvironmentConfig, VpsSettings
 @Component({
   selector: 'app-services',
   standalone: true,
-  imports: [CommonModule, FormsModule, TranslateModule, CdkDropList, CdkDrag, CdkDragHandle],
+  imports: [CommonModule, FormsModule, TranslateModule],
   templateUrl: './services.html',
   styleUrl: './services.less'
 })
@@ -22,7 +20,6 @@ export class ServicesComponent implements OnInit {
   private settingsSvc = inject(SettingsService);
   private configSvc = inject(EnvConfigsService);
   private deploySvc = inject(DeployService);
-  private http = inject(HttpClient);
 
   services = signal<ServiceStatus[]>([]);
   loading = signal<boolean>(true);
@@ -46,6 +43,29 @@ export class ServicesComponent implements OnInit {
     return this.allConfigSets().filter(s => s.name.toLowerCase().includes(q));
   });
 
+  groupedServices = computed(() => {
+    const groups = new Map<string, ServiceStatus[]>();
+
+    for (const service of this.services()) {
+      const key = (service.group || '').trim() || '__ungrouped__';
+      const items = groups.get(key) ?? [];
+      items.push(service);
+      groups.set(key, items);
+    }
+
+    return Array.from(groups.entries())
+      .sort(([left], [right]) => {
+        if (left === '__ungrouped__') return 1;
+        if (right === '__ungrouped__') return -1;
+        return left.localeCompare(right);
+      })
+      .map(([key, services]) => ({
+        key,
+        title: key === '__ungrouped__' ? 'Ungrouped' : key,
+        services
+      }));
+  });
+
   ngOnInit() {
     this.loadData();
     this.loadConfigSets();
@@ -65,29 +85,50 @@ export class ServicesComponent implements OnInit {
   }
 
   checkHeartbeats() {
-    this.services().forEach(s => {
-      // For SPA services (Angular, React), we also check Heartbeat in the UI
-      if (s.serviceType === 'Angular' || s.serviceType === 'React') {
-        const env = s.environments?.find(e => e.environmentId === this.targetEnvId);
-        if (env?.heartbeatUrl) {
-          s.isChecking = true;
-          s.hbStatus = 'Checking';
-          this.services.update(list => [...list]);
+    if (!this.targetEnvId) {
+      this.services.update(list => list.map(service => ({
+        ...service,
+        isChecking: false,
+        hbStatus: 'Unknown'
+      })));
+      return;
+    }
 
-          // Using native fetch with 'no-cors' mode to avoid CORS blocks.
-          // In 'no-cors' mode, we can't read the response body, but we know if the server responded.
-          fetch(env.heartbeatUrl, { mode: 'no-cors', cache: 'no-cache' })
-            .then(() => {
-              s.hbStatus = 'Running';
-              s.isChecking = false;
-              this.services.update(list => [...list]);
-            })
-            .catch(() => {
-              s.hbStatus = 'Stopped';
-              s.isChecking = false;
-              this.services.update(list => [...list]);
-            });
-        }
+    let hasHeartbeat = false;
+    this.services.update(list => list.map(service => {
+      const env = service.environments?.find(e => e.environmentId === this.targetEnvId);
+      const shouldCheck = !!env?.heartbeatUrl?.trim();
+      if (shouldCheck) hasHeartbeat = true;
+
+      return {
+        ...service,
+        isChecking: shouldCheck,
+        hbStatus: shouldCheck ? 'Checking' : 'Unknown'
+      };
+    }));
+
+    if (!hasHeartbeat) return;
+
+    this.servicesSvc.getHeartbeats(this.targetEnvId).subscribe({
+      next: (results) => {
+        const byServiceId = new Map(results.map(result => [result.serviceId, result.status]));
+        this.services.update(list => list.map(service => {
+          const env = service.environments?.find(e => e.environmentId === this.targetEnvId);
+          const shouldCheck = !!env?.heartbeatUrl?.trim();
+
+          return {
+            ...service,
+            isChecking: false,
+            hbStatus: shouldCheck ? (byServiceId.get(service.id!) ?? 'Unknown') : 'Unknown'
+          };
+        }));
+      },
+      error: () => {
+        this.services.update(list => list.map(service => ({
+          ...service,
+          isChecking: false,
+          hbStatus: service.isChecking ? 'Stopped' : 'Unknown'
+        })));
       }
     });
   }
@@ -109,6 +150,8 @@ export class ServicesComponent implements OnInit {
       } else if (envs.length > 0) {
         this.targetEnvId = envs[0].id || null;
       }
+
+      this.checkHeartbeats();
     });
   }
 
@@ -216,18 +259,10 @@ export class ServicesComponent implements OnInit {
     });
   }
 
-  onDrop(event: CdkDragDrop<ServiceStatus[]>) {
-    const servicesArray = [...this.services()];
-    moveItemInArray(servicesArray, event.previousIndex, event.currentIndex);
-    this.services.set(servicesArray);
-
-    const ids = servicesArray.map(s => s.id!).filter(id => !!id);
-    this.servicesSvc.reorder(ids).subscribe();
-  }
-
   private resetNewService(): Partial<ServiceDefinition> {
     return { 
       name: '', 
+      group: '',
       repoUrl: '', 
       projectPath: '', 
       iisSiteName: '', 
