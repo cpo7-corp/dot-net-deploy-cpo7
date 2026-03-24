@@ -1,6 +1,7 @@
 using NET.Deploy.Api.Data.Entities;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Text;
 
 namespace NET.Deploy.Api.Logic.Git;
 
@@ -170,7 +171,7 @@ public class GitLogic(ILogger<GitLogic> logger)
 
     public async Task<ProjectVersion?> GetCurrentCommitAsync(string repoLocalPath, string branch)
     {
-        var result = await RunGitWithOutputAsync(repoLocalPath, $"log -1 --format=\"%H|%an|%at|%s\" {branch}");
+        var result = await RunGitWithOutputAsync(repoLocalPath, $"log --encoding=UTF-8 -1 --format=\"%H|%an|%at|%s\" {branch}");
         if (string.IsNullOrWhiteSpace(result)) return null;
 
         var parts = result.Split('|');
@@ -190,7 +191,7 @@ public class GitLogic(ILogger<GitLogic> logger)
 
     public async Task<List<ProjectVersion>> ListRecentCommitsAsync(string repoLocalPath, string branch, int skip = 0, int take = 20)
     {
-        var result = await RunGitWithOutputAsync(repoLocalPath, $"log {branch} --skip={skip} -n {take} --format=\"%H|%an|%at|%s\"");
+        var result = await RunGitWithOutputAsync(repoLocalPath, $"log --encoding=UTF-8 {branch} --skip={skip} -n {take} --format=\"%H|%an|%at|%s\"");
         if (string.IsNullOrWhiteSpace(result)) return new();
 
         var lines = result.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
@@ -225,6 +226,8 @@ public class GitLogic(ILogger<GitLogic> logger)
             WorkingDirectory = workingDir,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8,
+            StandardErrorEncoding = Encoding.UTF8,
             UseShellExecute = false,
             CreateNoWindow = true
         };
