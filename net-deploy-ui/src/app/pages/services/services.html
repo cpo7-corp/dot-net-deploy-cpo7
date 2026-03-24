@@ -52,6 +52,7 @@
                     <th class="ps-2">{{ 'name' | translate }}</th>
                     <th>{{ 'type' | translate }}</th>
                     <th>{{ 'lastDeploy' | translate }}</th>
+                    <th>Version</th>
                     <th>{{ 'status' | translate }}</th>
                     <th>{{ 'heartbeat' | translate }}</th>
                     <th class="text-end pe-4">{{ 'actions' | translate }}</th>
@@ -68,6 +69,28 @@
                         }
                         @if (s.lastDeployed) {
                           <span class="text-white-50 small">{{s.lastDeployed | date:'dd-MM-yy HH:mm:ss'}}</span>
+                        }
+                      </td>
+                      <td>
+                        @if (getCurrentVersion(s); as ver) {
+                          <div class="small text-secondary d-flex align-items-center gap-1 opacity-75" style="font-size: 0.75rem;">
+                            <i class="bi bi-tag-fill text-info"></i>
+                            @if (getRepoCommitUrl(s.repoUrl, ver.commitHash); as commitUrl) {
+                              <a class="text-info text-decoration-none fw-bold" [href]="commitUrl" target="_blank" rel="noopener noreferrer">
+                                {{ ver.commitHash.substring(0, 7) }}
+                              </a>
+                            } @else {
+                              <span class="fw-bold text-light">{{ ver.commitHash.substring(0, 7) }}</span>
+                            }
+                            <span class="text-truncate" style="max-width: 120px;">({{ ver.branch }})</span>
+                          </div>
+                          @if (ver.commitMessage) {
+                            <div class="small text-white-50 text-truncate" [title]="ver.commitMessage" style="max-width: 220px;">
+                              {{ ver.commitMessage }}
+                            </div>
+                          }
+                        } @else {
+                          <span class="text-secondary small">-</span>
                         }
                       </td>
                       <td>

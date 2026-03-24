@@ -43,7 +43,12 @@ use of this software is at your own risk. CPO7 is not responsible for any damage
 - Use in a live production environment is solely at your own risk.
 - You may not enable, integrate, resell, or provide any LLM / AI-assisted workflow, automation, generation, or analysis capability without separate paid authorization from CPO7.
 
-## 8. REFUND POLICY
+## 8. LLM / AI PROTECTION
+- All LLM / AI-related components, integrations, prompts, workflows, automations, and connected services are protected as proprietary parts of the software.
+- You may not copy, extract, reuse, replicate, expose, monetize, sublicense, or provide access to any LLM / AI capability derived from this software without prior written and paid authorization from CPO7.
+- Any unauthorized use of LLM / AI functionality, whether directly or through modified, wrapped, automated, or third-party-connected versions of the software, is strictly prohibited.
+
+## 9. REFUND POLICY
 - **ALL SALES ARE FINAL.**
 - Due to the nature of digital goods and cryptocurrency transactions, **NO REFUNDS** will be issued under any circumstances.
 

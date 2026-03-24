@@ -162,6 +162,33 @@ export class ServicesComponent implements OnInit {
     }
   }
 
+  getCurrentVersion(service: ServiceStatus) {
+    if (!service.environments || !this.targetEnvId) return null;
+    return service.environments.find(e => e.environmentId === this.targetEnvId)?.currentVersion || null;
+  }
+
+  getRepoCommitUrl(repoUrl: string, commitHash: string): string | null {
+    const normalizedRepoUrl = this.normalizeRepoUrl(repoUrl);
+    if (!normalizedRepoUrl || !commitHash) return null;
+
+    try {
+      const url = new URL(normalizedRepoUrl);
+      const encodedCommitHash = encodeURIComponent(commitHash);
+
+      if (url.hostname.includes('gitlab')) {
+        return `${normalizedRepoUrl}/-/commit/${encodedCommitHash}`;
+      }
+
+      if (url.hostname.includes('bitbucket')) {
+        return `${normalizedRepoUrl}/commits/${encodedCommitHash}`;
+      }
+
+      return `${normalizedRepoUrl}/commit/${encodedCommitHash}`;
+    } catch {
+      return null;
+    }
+  }
+
   runAction(serviceId: string, action: string) {
     if (!this.targetEnvId || this.activeActionServiceId) return;
     this.activeActionServiceId = serviceId;
@@ -270,6 +297,19 @@ export class ServicesComponent implements OnInit {
       compileSingleFile: false,
       environments: [] 
     };
+  }
+
+  private normalizeRepoUrl(repoUrl: string): string | null {
+    if (!repoUrl) return null;
+
+    const trimmed = repoUrl.trim();
+    const blobIndex = trimmed.indexOf('/blob/');
+    const treeIndex = trimmed.indexOf('/tree/');
+    const splitIndex = blobIndex >= 0 ? blobIndex : treeIndex;
+    const repoOnly = splitIndex >= 0 ? trimmed.substring(0, splitIndex) : trimmed;
+    const withoutGitSuffix = repoOnly.replace(/\.git$/i, '');
+
+    return withoutGitSuffix || null;
   }
 
   getEnvConfig(envId: string): ServiceEnvironmentConfig {
