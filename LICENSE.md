@@ -8,6 +8,7 @@ By downloading, installing, or using this software, you agree to the terms below
 ## 1. PAYMENT & LICENSING
 - This software is **NOT FREE** for commercial or production use.
 - **FREE FOR LEARNING**: You are permitted to use this software for non-commercial learning or educational purposes only at no cost.
+- **LLM / AI Usage Requires Separate Payment**: Any use, integration, activation, or deployment of built-in or connected LLM, AI, or prompt-based capabilities requires separate paid authorization from CPO7, unless explicitly approved otherwise in writing.
 
 - **License Fee**: **100 USDT per user / per year**.
 - The license is valid for **one year (12 months)** from the date of payment.
@@ -40,6 +41,7 @@ use of this software is at your own risk. CPO7 is not responsible for any damage
 ## 7. INTENDED USE & RESTRICTIONS
 - This software is designed for **AUTOMATED DEPLOYMENT AND MANAGEMENT**.
 - Use in a live production environment is solely at your own risk.
+- You may not enable, integrate, resell, or provide any LLM / AI-assisted workflow, automation, generation, or analysis capability without separate paid authorization from CPO7.
 
 ## 8. REFUND POLICY
 - **ALL SALES ARE FINAL.**
