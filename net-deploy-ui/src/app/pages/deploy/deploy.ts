@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal, effect } from '@angular/core';
+import { Component, inject, OnInit, signal, effect, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
@@ -21,6 +21,46 @@ export class DeployComponent implements OnInit {
   private translate = inject(TranslateService);
 
   services = signal<ServiceStatus[]>([]);
+  groupedServices = computed(() => {
+    const groups = new Map<string, ServiceStatus[]>();
+
+    for (const service of this.services()) {
+      const key = (service.group || '').trim() || '__ungrouped__';
+      const items = groups.get(key) ?? [];
+      items.push(service);
+      groups.set(key, items);
+    }
+
+    return Array.from(groups.entries())
+      .map(([key, services]) => ({
+        key,
+        title: key === '__ungrouped__' ? 'Ungrouped' : key,
+        services: [...services].sort((a, b) => {
+          const leftOrder = a.order ?? Number.MAX_SAFE_INTEGER;
+          const rightOrder = b.order ?? Number.MAX_SAFE_INTEGER;
+
+          if (leftOrder !== rightOrder) {
+            return leftOrder - rightOrder;
+          }
+
+          return a.name.localeCompare(b.name);
+        })
+      }))
+      .sort((left, right) => {
+        if (left.key === '__ungrouped__') return 1;
+        if (right.key === '__ungrouped__') return -1;
+
+        const leftOrder = left.services[0]?.order ?? Number.MAX_SAFE_INTEGER;
+        const rightOrder = right.services[0]?.order ?? Number.MAX_SAFE_INTEGER;
+
+        if (leftOrder !== rightOrder) {
+          return leftOrder - rightOrder;
+        }
+
+        return left.title.localeCompare(right.title);
+      })
+      ;
+  });
   environments = signal<VpsSettings[]>([]);
   selectedEnvironmentId = signal<string | null>(null);
   selectedServiceIds: Set<string> = new Set();
@@ -60,8 +100,7 @@ export class DeployComponent implements OnInit {
   ngOnInit() {
     this.servicesSvc.getAll().subscribe({
       next: (data) => {
-        const sorted = data.sort((a, b) => a.name.localeCompare(b.name));
-        this.services.set(sorted);
+        this.services.set(data);
         this.updateDefaultBranches();
         this.loading.set(false);
       }
