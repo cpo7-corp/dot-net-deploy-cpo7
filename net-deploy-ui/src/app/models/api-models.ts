@@ -38,6 +38,13 @@ export interface ProjectVersion {
   updated: string | Date;
 }
 
+export interface PagedResult<T> {
+  items: T[];
+  skip: number;
+  take: number;
+  hasMore: boolean;
+}
+
 export interface DeploymentHistory {
   id?: string;
   serviceId: string;

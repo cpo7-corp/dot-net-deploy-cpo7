@@ -5,7 +5,7 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { ServicesMonitorService } from '../../services/services-monitor.service';
 import { DeployService } from '../../services/deploy.service';
 import { SettingsService } from '../../services/settings.service';
-import { ServiceStatus, DeployLogEntry, VpsSettings } from '../../models/api-models';
+import { ServiceStatus, DeployLogEntry, VpsSettings, ProjectVersion, DeploymentHistory } from '../../models/api-models';
 
 @Component({
   selector: 'app-deploy',
@@ -26,14 +26,18 @@ export class DeployComponent implements OnInit {
   selectedServiceIds: Set<string> = new Set();
   serviceBranches: Record<string, string> = {}; // Stores custom branch per service
   serviceCommits: Record<string, string> = {}; // Stores custom commit hash per service (if selected)
+  serviceCommitMessages: Record<string, string> = {}; // Stores selected commit message per service
 
   // Commit Selector State
   showCommitSelector = signal<boolean>(false);
   selectingService = signal<ServiceStatus | null>(null);
-  recentCommits = signal<any[]>([]);
-  deploymentHistory = signal<any[]>([]);
+  recentCommits = signal<ProjectVersion[]>([]);
+  deploymentHistory = signal<DeploymentHistory[]>([]);
   loadingCommits = signal<boolean>(false);
+  loadingMoreCommits = signal<boolean>(false);
+  hasMoreCommits = signal<boolean>(true);
   activeTab = signal<'git' | 'history'>('git');
+  private readonly commitsPageSize = 20;
 
   loading = signal<boolean>(true);
 
@@ -185,7 +189,7 @@ export class DeployComponent implements OnInit {
     this.selectingService.set(service);
     this.showCommitSelector.set(true);
     this.activeTab.set('git');
-    this.fetchCommits();
+    this.fetchCommits(true);
     this.fetchHistory();
   }
 
@@ -194,17 +198,39 @@ export class DeployComponent implements OnInit {
     this.selectingService.set(null);
   }
 
-  fetchCommits() {
+  fetchCommits(reset: boolean = false) {
     const s = this.selectingService();
     if (!s) return;
-    this.loadingCommits.set(true);
+
+    if (reset) {
+      this.recentCommits.set([]);
+      this.hasMoreCommits.set(true);
+    }
+
+    if (!reset && (!this.hasMoreCommits() || this.loadingCommits() || this.loadingMoreCommits())) {
+      return;
+    }
+
     const branch = this.serviceBranches[s.id!] || 'main';
-    this.deploySvc.getCommits(s.repoUrl, branch).subscribe({
-      next: (commits) => {
-        this.recentCommits.set(commits);
+    const skip = reset ? 0 : this.recentCommits().length;
+
+    if (reset) {
+      this.loadingCommits.set(true);
+    } else {
+      this.loadingMoreCommits.set(true);
+    }
+
+    this.deploySvc.getCommits(s.repoUrl, branch, skip, this.commitsPageSize).subscribe({
+      next: (result) => {
+        this.recentCommits.set(reset ? result.items : [...this.recentCommits(), ...result.items]);
+        this.hasMoreCommits.set(result.hasMore);
         this.loadingCommits.set(false);
+        this.loadingMoreCommits.set(false);
       },
-      error: () => this.loadingCommits.set(false)
+      error: () => {
+        this.loadingCommits.set(false);
+        this.loadingMoreCommits.set(false);
+      }
     });
   }
 
@@ -217,22 +243,84 @@ export class DeployComponent implements OnInit {
     });
   }
 
-  selectCommit(commit: any) {
+  selectCommit(commit: ProjectVersion) {
     const s = this.selectingService();
     if (!s) return;
     this.serviceCommits[s.id!] = commit.commitHash;
-    // Also update branch field to show hash visually
-    this.serviceBranches[s.id!] = commit.commitHash.substring(0, 7);
+    this.serviceCommitMessages[s.id!] = commit.commitMessage;
+    this.serviceBranches[s.id!] = commit.branch || this.serviceBranches[s.id!] || 'main';
     this.closeCommitSelector();
   }
 
-  selectFromHistory(item: any) {
+  selectFromHistory(item: DeploymentHistory) {
     const s = this.selectingService();
     if (!s) return;
     this.serviceCommits[s.id!] = item.version.commitHash;
-    this.serviceBranches[s.id!] = item.version.commitHash.substring(0, 7);
-    // Potentially restore config sets too if we want full rollback
+    this.serviceCommitMessages[s.id!] = item.version.commitMessage;
+    this.serviceBranches[s.id!] = item.version.branch || this.serviceBranches[s.id!] || 'main';
     this.closeCommitSelector();
+  }
+
+  updateServiceBranch(serviceId: string, branch: string) {
+    this.serviceBranches[serviceId] = branch;
+    delete this.serviceCommits[serviceId];
+    delete this.serviceCommitMessages[serviceId];
+  }
+
+  onCommitListScroll(event: Event) {
+    if (this.activeTab() !== 'git' || !this.showCommitSelector()) return;
+
+    const element = event.target as HTMLElement | null;
+    if (!element) return;
+
+    const threshold = 80;
+    const remaining = element.scrollHeight - element.scrollTop - element.clientHeight;
+    if (remaining <= threshold) {
+      this.fetchCommits();
+    }
+  }
+
+  getSelectedCommitHash(serviceId: string): string | null {
+    return this.serviceCommits[serviceId] || null;
+  }
+
+  getSelectedCommitMessage(serviceId: string): string | null {
+    return this.serviceCommitMessages[serviceId] || null;
+  }
+
+  getRepoCommitUrl(repoUrl: string, commitHash: string): string | null {
+    const normalizedRepoUrl = this.normalizeRepoUrl(repoUrl);
+    if (!normalizedRepoUrl || !commitHash) return null;
+
+    try {
+      const url = new URL(normalizedRepoUrl);
+      const encodedCommitHash = encodeURIComponent(commitHash);
+
+      if (url.hostname.includes('gitlab')) {
+        return `${normalizedRepoUrl}/-/commit/${encodedCommitHash}`;
+      }
+
+      if (url.hostname.includes('bitbucket')) {
+        return `${normalizedRepoUrl}/commits/${encodedCommitHash}`;
+      }
+
+      return `${normalizedRepoUrl}/commit/${encodedCommitHash}`;
+    } catch {
+      return null;
+    }
+  }
+
+  private normalizeRepoUrl(repoUrl: string): string | null {
+    if (!repoUrl) return null;
+
+    const trimmed = repoUrl.trim();
+    const blobIndex = trimmed.indexOf('/blob/');
+    const treeIndex = trimmed.indexOf('/tree/');
+    const splitIndex = blobIndex >= 0 ? blobIndex : treeIndex;
+    const repoOnly = splitIndex >= 0 ? trimmed.substring(0, splitIndex) : trimmed;
+    const withoutGitSuffix = repoOnly.replace(/\.git$/i, '');
+
+    return withoutGitSuffix || null;
   }
 
   private scrollToBottom() {

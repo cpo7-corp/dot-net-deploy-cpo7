@@ -19,15 +19,33 @@ public class GitController(GitLogic gitLogic, SettingsLogic settingsLogic) : Con
     }
 
     [HttpGet("commits")]
-    public async Task<IActionResult> GetCommits([FromQuery] string repoUrl, [FromQuery] string branch = "main")
+    public async Task<IActionResult> GetCommits(
+        [FromQuery] string repoUrl,
+        [FromQuery] string branch = "main",
+        [FromQuery] int skip = 0,
+        [FromQuery] int take = 20)
     {
         if (string.IsNullOrWhiteSpace(repoUrl)) return BadRequest("RepoUrl is required.");
+        if (skip < 0) return BadRequest("Skip must be zero or greater.");
+        if (take <= 0 || take > 100) return BadRequest("Take must be between 1 and 100.");
 
         var settings = await settingsLogic.GetAsync();
         var (parsedUrl, _, _) = gitLogic.ParseGitUrl(repoUrl);
         var repoPath = gitLogic.GetRepoLocalPath(settings.Git, parsedUrl);
 
-        var commits = await gitLogic.ListRecentCommitsAsync(repoPath, branch);
-        return Ok(commits);
+        var commits = await gitLogic.ListRecentCommitsAsync(repoPath, branch, skip, take + 1);
+        var hasMore = commits.Count > take;
+        if (hasMore)
+        {
+            commits = commits.Take(take).ToList();
+        }
+
+        return Ok(new
+        {
+            items = commits,
+            skip,
+            take,
+            hasMore
+        });
     }
 }

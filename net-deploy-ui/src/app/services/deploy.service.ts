@@ -1,6 +1,6 @@
 import { Injectable, NgZone, signal, WritableSignal } from '@angular/core';
 import { ApiService } from './api.service';
-import { DeployLogEntry } from '../models/api-models';
+import { DeployLogEntry, PagedResult, ProjectVersion } from '../models/api-models';
 import { Observable, Subject } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 
@@ -222,8 +222,10 @@ export class DeployService extends ApiService {
     return this.http!.get<DeployLogEntry[]>(`${this.baseUrl}/Deploy/logs/${sessionId}`);
   }
 
-  getCommits(repoUrl: string, branch: string = 'main'): Observable<any[]> {
-    return this.http!.get<any[]>(`${this.baseUrl}/Git/commits?repoUrl=${encodeURIComponent(repoUrl)}&branch=${branch}`);
+  getCommits(repoUrl: string, branch: string = 'main', skip: number = 0, take: number = 20): Observable<PagedResult<ProjectVersion>> {
+    return this.http!.get<PagedResult<ProjectVersion>>(
+      `${this.baseUrl}/Git/commits?repoUrl=${encodeURIComponent(repoUrl)}&branch=${encodeURIComponent(branch)}&skip=${skip}&take=${take}`
+    );
   }
 
   getHistory(serviceId: string, environmentId: string, limit: number = 20): Observable<any[]> {

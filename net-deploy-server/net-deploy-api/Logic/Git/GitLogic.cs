@@ -188,9 +188,9 @@ public class GitLogic(ILogger<GitLogic> logger)
         };
     }
 
-    public async Task<List<ProjectVersion>> ListRecentCommitsAsync(string repoLocalPath, string branch, int count = 20)
+    public async Task<List<ProjectVersion>> ListRecentCommitsAsync(string repoLocalPath, string branch, int skip = 0, int take = 20)
     {
-        var result = await RunGitWithOutputAsync(repoLocalPath, $"log -{count} --format=\"%H|%an|%at|%s\" {branch}");
+        var result = await RunGitWithOutputAsync(repoLocalPath, $"log {branch} --skip={skip} -n {take} --format=\"%H|%an|%at|%s\"");
         if (string.IsNullOrWhiteSpace(result)) return new();
 
         var lines = result.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);

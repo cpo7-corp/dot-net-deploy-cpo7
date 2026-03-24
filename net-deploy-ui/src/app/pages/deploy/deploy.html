@@ -64,7 +64,7 @@
                           <i class="bi bi-tag-fill text-info"></i>
                           <span class="fw-bold text-light">{{ ver.commitHash.substring(0, 7) }}</span>
                           <span class="text-truncate" style="max-width: 120px;">({{ ver.branch }})</span>
-                          <span class="ms-auto" style="font-size: 0.65rem;">{{ ver.updated | date:'short' }}</span>
+                          <span class="ms-auto" style="font-size: 0.65rem;">{{ ver.updated | date:'dd-MM-yy HH:mm:ss' }}</span>
                         </div>
                       }
 
@@ -72,12 +72,35 @@
                         <span class="input-group-text bg-dark border-secondary text-secondary"
                           style="font-size: 0.7rem;">{{ 'branch' | translate }}</span>
                         <input type="text" class="form-control bg-dark text-white border-secondary"
-                          [(ngModel)]="serviceBranches[s.id!]" [disabled]="deploying()">
+                          [ngModel]="serviceBranches[s.id!]" (ngModelChange)="updateServiceBranch(s.id!, $event)" [disabled]="deploying()">
                         <button class="btn btn-outline-secondary border-secondary" type="button" 
                           (click)="openCommitSelector(s); $event.stopPropagation()" [disabled]="deploying()" title="Select Commit">
                           <i class="bi bi-git"></i>
                         </button>
                       </div>
+                      @if (getSelectedCommitHash(s.id!); as selectedCommitHash) {
+                        <div class="small text-secondary mt-2">
+                          <div class="d-flex align-items-center gap-2 flex-wrap">
+                          @if (getRepoCommitUrl(s.repoUrl, selectedCommitHash); as commitUrl) {
+                            <a class="branch-link badge bg-info bg-opacity-10 text-info border border-info border-opacity-25"
+                              [href]="commitUrl" target="_blank" rel="noopener noreferrer"
+                              (click)="$event.stopPropagation()">
+                              {{ selectedCommitHash.substring(0, 7) }}
+                            </a>
+                          } @else {
+                            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25">
+                              {{ selectedCommitHash.substring(0, 7) }}
+                            </span>
+                          }
+                          <span>{{ serviceBranches[s.id!] }}</span>
+                          </div>
+                          @if (getSelectedCommitMessage(s.id!); as selectedCommitMessage) {
+                            <div class="mt-1 text-light text-truncate" [title]="selectedCommitMessage">
+                              {{ selectedCommitMessage }}
+                            </div>
+                          }
+                        </div>
+                      }
                     </div>
                   }
                 </div>
@@ -282,7 +305,7 @@
             </li>
           </ul>
 
-          <div class="modal-list-container overflow-auto" style="max-height: 400px; min-height: 300px;">
+          <div class="modal-list-container overflow-auto" style="max-height: 400px; min-height: 300px;" (scroll)="onCommitListScroll($event)">
             @if (activeTab() === 'git') {
               <div class="p-0">
                 @if (loadingCommits()) {
@@ -296,14 +319,27 @@
                       <div class="list-group-item bg-transparent text-white border-bottom border-secondary list-item-hover p-3"
                         (click)="selectCommit(commit)" style="cursor: pointer;">
                         <div class="d-flex justify-content-between align-items-start mb-1">
-                          <code class="text-info fw-bold">{{ commit.commitHash.substring(0, 7) }}</code>
-                          <span class="small text-secondary">{{ commit.updated | date:'short' }}</span>
+                          @if (getRepoCommitUrl(selectingService()?.repoUrl || '', commit.commitHash); as commitUrl) {
+                            <a class="branch-link fw-bold" [href]="commitUrl" target="_blank" rel="noopener noreferrer"
+                              (click)="$event.stopPropagation()">
+                              <code class="text-info fw-bold">{{ commit.commitHash.substring(0, 7) }}</code>
+                            </a>
+                          } @else {
+                            <code class="text-info fw-bold">{{ commit.commitHash.substring(0, 7) }}</code>
+                          }
+                          <span class="small text-secondary">{{ commit.updated | date:'dd-MM-yy HH:mm:ss' }}</span>
                         </div>
                         <div class="text-light mb-1">{{ commit.commitMessage }}</div>
                         <div class="small text-secondary d-flex gap-3">
                           <span><i class="bi bi-person me-1"></i> {{ commit.author }}</span>
                           <span><i class="bi bi-diagram-2 me-1"></i> {{ commit.branch }}</span>
                         </div>
+                      </div>
+                    }
+                    @if (loadingMoreCommits()) {
+                      <div class="p-3 text-center text-secondary small">
+                        <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                        Loading more...
                       </div>
                     }
                   </div>
@@ -325,13 +361,20 @@
                         <div class="d-flex justify-content-between align-items-start mb-1">
                           <div class="d-flex align-items-center gap-2">
                             <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25">{{ 'rollback' | translate }}</span>
-                            <code class="text-info fw-bold">{{ item.version.commitHash.substring(0, 7) }}</code>
+                            @if (getRepoCommitUrl(selectingService()?.repoUrl || '', item.version.commitHash); as commitUrl) {
+                              <a class="branch-link fw-bold" [href]="commitUrl" target="_blank" rel="noopener noreferrer"
+                                (click)="$event.stopPropagation()">
+                                <code class="text-info fw-bold">{{ item.version.commitHash.substring(0, 7) }}</code>
+                              </a>
+                            } @else {
+                              <code class="text-info fw-bold">{{ item.version.commitHash.substring(0, 7) }}</code>
+                            }
                           </div>
-                          <span class="small text-secondary">{{ item.created | date:'short' }}</span>
+                          <span class="small text-secondary">{{ item.created | date:'dd-MM-yy HH:mm:ss' }}</span>
                         </div>
                         <div class="text-light mb-1">{{ item.version.commitMessage }}</div>
                         <div class="small text-secondary text-truncate">
-                          <i class="bi bi-calendar-event me-1"></i> {{ 'created' | translate }}: {{ item.created | date:'medium' }}
+                          <i class="bi bi-calendar-event me-1"></i> {{ 'created' | translate }}: {{ item.created | date:'dd-MM-yy HH:mm:ss' }}
                         </div>
                       </div>
                     }
