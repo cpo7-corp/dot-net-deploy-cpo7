@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>NET.Deploy.Api</RootNamespace>
+    <Description>Proprietary software. LLM/AI usage requires separate paid authorization from CPO7. See LICENSE.md.</Description>
   </PropertyGroup>
 
   <ItemGroup>
