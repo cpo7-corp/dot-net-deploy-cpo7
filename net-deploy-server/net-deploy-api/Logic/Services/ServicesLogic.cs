@@ -1,6 +1,6 @@
 using MongoDB.Driver;
 using NET.Deploy.Api.Data;
-using NET.Deploy.Api.Logic.Services.Entities;
+using NET.Deploy.Api.Data.Entities;
 
 namespace NET.Deploy.Api.Logic.Services;
 
@@ -66,12 +66,27 @@ public class ServicesLogic(MongoDbContext db)
     public async Task MarkDeployedAsync(string id)
     {
         var update = Builders<ServiceDefinitionDB>.Update
-            .Set(s => s.LastDeployed, DateTime.UtcNow);
+            .Set(s => s.Updated, DateTime.UtcNow);
 
         await db.Services.UpdateOneAsync(
             Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)),
             update);
     }
+
+    public async Task UpdateVersionAsync(string serviceId, string environmentId, ProjectVersion version)
+    {
+        var filter = Builders<ServiceDefinitionDB>.Filter.And(
+            Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(serviceId)),
+            Builders<ServiceDefinitionDB>.Filter.ElemMatch(s => s.Environments, e => e.EnvironmentId == environmentId)
+        );
+
+        var update = Builders<ServiceDefinitionDB>.Update
+            .Set("Environments.$.CurrentVersion", version)
+            .Set(s => s.Updated, DateTime.UtcNow);
+
+        await db.Services.UpdateOneAsync(filter, update);
+    }
+
     public async Task UpdateOrderAsync(List<string> ids)
     {
         for (int i = 0; i < ids.Count; i++)

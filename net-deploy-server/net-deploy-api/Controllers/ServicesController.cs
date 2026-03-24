@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.IIS;
 using NET.Deploy.Api.Logic.Services;
 using NET.Deploy.Api.Logic.Services.Entities;
@@ -16,11 +17,14 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
     {
         var services = await servicesLogic.GetAllAsync();
 
-        var statuses = await Task.WhenAll(services.Select(async s => {
+        var statuses = await Task.WhenAll(services.Select(async s =>
+        {
             string status = "Unknown";
-            try {
+            try
+            {
                 status = await iisLogic.GetStatusAsync(s.IisSiteName, s.ServiceType);
-            } catch { /* log and silent */ }
+            }
+            catch { /* log and silent */ }
 
             return new ServiceStatus
             {
@@ -31,7 +35,7 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
                 IisSiteName = s.IisSiteName,
                 RepoUrl = s.RepoUrl,
                 ProjectPath = s.ProjectPath,
-                LastDeployed = s.LastDeployed,
+                Updated = s.Updated,
                 CompileSingleFile = s.CompileSingleFile,
                 Environments = s.Environments,
                 Status = status

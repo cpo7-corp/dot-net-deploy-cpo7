@@ -1,7 +1,7 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace NET.Deploy.Api.Logic.DeployLogs.Entities;
+namespace NET.Deploy.Api.Data.Entities;
 
 [BsonIgnoreExtraElements]
 public class DeployLogEntryDB

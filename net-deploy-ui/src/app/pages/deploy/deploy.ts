@@ -25,6 +25,15 @@ export class DeployComponent implements OnInit {
   selectedEnvironmentId = signal<string | null>(null);
   selectedServiceIds: Set<string> = new Set();
   serviceBranches: Record<string, string> = {}; // Stores custom branch per service
+  serviceCommits: Record<string, string> = {}; // Stores custom commit hash per service (if selected)
+
+  // Commit Selector State
+  showCommitSelector = signal<boolean>(false);
+  selectingService = signal<ServiceStatus | null>(null);
+  recentCommits = signal<any[]>([]);
+  deploymentHistory = signal<any[]>([]);
+  loadingCommits = signal<boolean>(false);
+  activeTab = signal<'git' | 'history'>('git');
 
   loading = signal<boolean>(true);
 
@@ -108,7 +117,7 @@ export class DeployComponent implements OnInit {
 
     const deploymentConfigs = configs || Array.from(this.selectedServiceIds).map(id => ({
       serviceId: id,
-      branch: this.serviceBranches[id] || 'main'
+      branch: this.serviceCommits[id] ? this.serviceCommits[id] : (this.serviceBranches[id] || 'main')
     }));
 
     const pull = retryMode === 3 ? false : this.deploySvc.deployPull();
@@ -165,6 +174,65 @@ export class DeployComponent implements OnInit {
 
   objectKeys(obj: any) { 
     return Object.keys(obj); 
+  }
+
+  getCurrentVersion(service: any) {
+    if (!service.environments || !this.selectedEnvironmentId()) return null;
+    return service.environments.find((e: any) => e.environmentId === this.selectedEnvironmentId())?.currentVersion;
+  }
+
+  openCommitSelector(service: ServiceStatus) {
+    this.selectingService.set(service);
+    this.showCommitSelector.set(true);
+    this.activeTab.set('git');
+    this.fetchCommits();
+    this.fetchHistory();
+  }
+
+  closeCommitSelector() {
+    this.showCommitSelector.set(false);
+    this.selectingService.set(null);
+  }
+
+  fetchCommits() {
+    const s = this.selectingService();
+    if (!s) return;
+    this.loadingCommits.set(true);
+    const branch = this.serviceBranches[s.id!] || 'main';
+    this.deploySvc.getCommits(s.repoUrl, branch).subscribe({
+      next: (commits) => {
+        this.recentCommits.set(commits);
+        this.loadingCommits.set(false);
+      },
+      error: () => this.loadingCommits.set(false)
+    });
+  }
+
+  fetchHistory() {
+    const s = this.selectingService();
+    const envId = this.selectedEnvironmentId();
+    if (!s || !envId) return;
+    this.deploySvc.getHistory(s.id!, envId).subscribe(history => {
+      this.deploymentHistory.set(history);
+    });
+  }
+
+  selectCommit(commit: any) {
+    const s = this.selectingService();
+    if (!s) return;
+    this.serviceCommits[s.id!] = commit.commitHash;
+    // Also update branch field to show hash visually
+    this.serviceBranches[s.id!] = commit.commitHash.substring(0, 7);
+    this.closeCommitSelector();
+  }
+
+  selectFromHistory(item: any) {
+    const s = this.selectingService();
+    if (!s) return;
+    this.serviceCommits[s.id!] = item.version.commitHash;
+    this.serviceBranches[s.id!] = item.version.commitHash.substring(0, 7);
+    // Potentially restore config sets too if we want full rollback
+    this.closeCommitSelector();
   }
 
   private scrollToBottom() {

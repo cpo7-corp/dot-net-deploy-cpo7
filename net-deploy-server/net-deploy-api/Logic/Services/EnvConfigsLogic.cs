@@ -1,6 +1,6 @@
 using MongoDB.Driver;
 using NET.Deploy.Api.Data;
-using NET.Deploy.Api.Logic.Services.Entities;
+using NET.Deploy.Api.Data.Entities;
 
 namespace NET.Deploy.Api.Logic.Services;
 
@@ -40,7 +40,7 @@ public class EnvConfigsLogic(MongoDbContext db)
         if (config.Variables != null)
         {
             config.Variables = config.Variables
-                .Select(v => new EnvVariableDB { 
+                .Select(v => new EnvVariable { 
                     Key = v.Key?.Trim() ?? string.Empty, 
                     Value = v.Value?.Trim() ?? string.Empty 
                 })

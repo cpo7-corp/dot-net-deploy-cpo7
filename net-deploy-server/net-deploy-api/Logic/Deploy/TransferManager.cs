@@ -1,4 +1,4 @@
-using NET.Deploy.Api.Logic.Settings.Entities;
+using NET.Deploy.Api.Data.Entities;
 using Renci.SshNet;
 
 namespace NET.Deploy.Api.Logic.Deploy;

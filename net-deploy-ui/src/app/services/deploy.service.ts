@@ -84,7 +84,7 @@ export class DeployService extends ApiService {
           sessionId: 'client',
           level: 'ERROR',
           message: 'Connection to server failed or dropped randomly.',
-          timestamp: new Date().toISOString()
+          created: new Date().toISOString()
         }]);
       }
     });
@@ -221,10 +221,18 @@ export class DeployService extends ApiService {
   getLogs(sessionId: string): Observable<DeployLogEntry[]> {
     return this.http!.get<DeployLogEntry[]>(`${this.baseUrl}/Deploy/logs/${sessionId}`);
   }
+
+  getCommits(repoUrl: string, branch: string = 'main'): Observable<any[]> {
+    return this.http!.get<any[]>(`${this.baseUrl}/Git/commits?repoUrl=${encodeURIComponent(repoUrl)}&branch=${branch}`);
+  }
+
+  getHistory(serviceId: string, environmentId: string, limit: number = 20): Observable<any[]> {
+    return this.http!.get<any[]>(`${this.baseUrl}/DeployHistory/${serviceId}/${environmentId}?limit=${limit}`);
+  }
 }
 
 export interface SessionSummary {
   sessionId: string;
-  timestamp: string;
+  created: string;
   hasErrors: boolean;
 }

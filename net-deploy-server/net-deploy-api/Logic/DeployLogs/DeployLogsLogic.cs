@@ -1,6 +1,6 @@
 using MongoDB.Driver;
 using NET.Deploy.Api.Data;
-using NET.Deploy.Api.Logic.DeployLogs.Entities;
+using NET.Deploy.Api.Data.Entities;
 
 namespace NET.Deploy.Api.Logic.DeployLogs;
 
@@ -15,10 +15,10 @@ public class DeployLogsLogic(MongoDbContext db)
     public async Task<List<DeployLogEntryDB>> GetBySessionAsync(string sessionId) =>
         await db.DeployLogs
             .Find(e => e.SessionId == sessionId)
-            .SortBy(e => e.Timestamp)
+            .SortBy(e => e.Created)
             .ToListAsync();
 
-    public record SessionSummary(string SessionId, DateTime Timestamp, bool HasErrors);
+    public record SessionSummary(string SessionId, DateTime Created, bool HasErrors);
 
     public async Task<List<SessionSummary>> GetSessionsPagedAsync(int skip, int limit)
     {
@@ -27,7 +27,7 @@ public class DeployLogsLogic(MongoDbContext db)
                 e => e.SessionId,
                 g => new { 
                     SessionId = g.Key, 
-                    LastRun = g.Max(x => x.Timestamp),
+                    LastRun = g.Max(x => x.Created),
                     ErrorCount = g.Count(x => x.Level == "ERROR")
                 })
             .SortByDescending(g => g.LastRun)

@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using NET.Deploy.Api.Logic.Services;
-using NET.Deploy.Api.Logic.Services.Entities;
+using NET.Deploy.Api.Data.Entities;
 
 namespace NET.Deploy.Api.Controllers;
 

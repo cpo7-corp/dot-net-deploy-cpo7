@@ -1,13 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Deploy;
 using NET.Deploy.Api.Logic.DeployLogs;
-using NET.Deploy.Api.Logic.DeployLogs.Entities;
 using NET.Deploy.Api.Logic.Services;
-using NET.Deploy.Api.Logic.Services.Entities;
 using NET.Deploy.Api.Logic.Settings;
-using NET.Deploy.Api.Logic.Settings.Entities;
 using System.Collections.Concurrent;
-using System.Threading;
 
 
 
@@ -16,11 +13,11 @@ namespace NET.Deploy.Api.Controllers;
 public record ServiceDeploymentConfig(string ServiceId, string? Branch);
 public record ServiceActionRequest(string ServiceId, string EnvironmentId, string Action);
 public record DeployRequest(
-    List<ServiceDeploymentConfig> Services, 
-    string? EnvironmentId, 
-    bool ForceClean = false, 
-    bool Pull = true, 
-    bool Build = true, 
+    List<ServiceDeploymentConfig> Services,
+    string? EnvironmentId,
+    bool ForceClean = false,
+    bool Pull = true,
+    bool Build = true,
     bool Deploy = true);
 
 
@@ -93,7 +90,7 @@ public class DeployController(
 
         async Task Log(string level, string message, string? serviceId = null)
         {
-            var entry = new DeployLogEntryDB { SessionId = sessionId, Level = level, Message = message, ServiceId = serviceId, Timestamp = DateTime.UtcNow };
+            var entry = new DeployLogEntryDB { SessionId = sessionId, Level = level, Message = message, ServiceId = serviceId, Created = DateTime.UtcNow };
             lock (logEntries) { logEntries.Add(entry); }
             var line = $"data: {{\"level\":\"{level}\",\"message\":{System.Text.Json.JsonSerializer.Serialize(message)},\"serviceId\":\"{serviceId}\"}}\n\n";
             await responseLock.WaitAsync();
@@ -120,13 +117,13 @@ public class DeployController(
                 var branchKey = branchOverride ?? defaultBranch;
                 var prepKey = $"{srv.Id}|{branchKey}";
 
-                return servicePrepTasks.GetOrAdd(prepKey, async _ => 
+                return servicePrepTasks.GetOrAdd(prepKey, async _ =>
                 {
                     var (repoUrl, gitBranch, _) = deployLogic.ParseGitUrl(srv.RepoUrl);
                     var effectiveRepoBranch = branchOverride ?? (string.IsNullOrWhiteSpace(envCfg?.DefaultBranch) ? gitBranch : envCfg.DefaultBranch);
                     var repoKey = $"{repoUrl}|{effectiveRepoBranch}";
 
-                    var repoUpdated = !request.Pull || await repoUpdateTasks.GetOrAdd(repoKey, _ => 
+                    var repoUpdated = !request.Pull || await repoUpdateTasks.GetOrAdd(repoKey, _ =>
                         deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean)
                     );
 
@@ -205,7 +202,7 @@ public class DeployController(
 
         async Task Log(string level, string message, string? serviceId = null)
         {
-            var entry = new DeployLogEntryDB { SessionId = sessionId, Level = level, Message = message, ServiceId = serviceId, Timestamp = DateTime.UtcNow };
+            var entry = new DeployLogEntryDB { SessionId = sessionId, Level = level, Message = message, ServiceId = serviceId, Created = DateTime.UtcNow };
             lock (logEntries) { logEntries.Add(entry); }
             var line = $"data: {{\"level\":\"{level}\",\"message\":{System.Text.Json.JsonSerializer.Serialize(message)},\"serviceId\":\"{serviceId}\"}}\n\n";
             await responseLock.WaitAsync();

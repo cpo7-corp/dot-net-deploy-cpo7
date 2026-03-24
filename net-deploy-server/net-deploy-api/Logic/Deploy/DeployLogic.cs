@@ -1,18 +1,9 @@
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.Services;
-using NET.Deploy.Api.Logic.Services.Entities;
-using NET.Deploy.Api.Logic.Settings.Entities;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-
-
 
 namespace NET.Deploy.Api.Logic.Deploy;
 
@@ -22,7 +13,9 @@ public class DeployLogic(
     BuildManager buildManager,
     TransferManager transferManager,
     ProcessRunner processRunner,
-    EnvConfigsLogic envConfigsLogic)
+    EnvConfigsLogic envConfigsLogic,
+    NET.Deploy.Api.Logic.DeployHistory.DeployHistoryLogic deployHistoryLogic,
+    ServicesLogic servicesLogic)
 {
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> _repoLocks = new();
     private SemaphoreSlim GetRepoLock(string path) => _repoLocks.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
@@ -213,6 +206,18 @@ public class DeployLogic(
         bool prepSuccess = await PrepAndBuildServiceAsync(service, settings, log, environmentId, branchOverride, forceClean, skipPull, skipBuildIfOutputExists);
         if (!prepSuccess) return false;
 
+        // NEW: Get current commit info
+        ProjectVersion? currentVersion = null;
+        try
+        {
+            var (repoUrl, gitBranch, projectPath) = gitLogic.ParseGitUrl(service.RepoUrl);
+            var effectiveBranch = GetEffectiveBranch(service, envConfig, gitBranch, branchOverride);
+            var effectiveProjectPath = NormalizePath(GetEffectiveProjectPath(service, projectPath));
+            var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl, effectiveProjectPath);
+            currentVersion = await gitLogic.GetCurrentCommitAsync(repoLocalPath, effectiveBranch);
+        }
+        catch { }
+
         // PHASE 2: STOP (Site/Service)
         if (isWindowsService)
             await ManageWindowsServiceAsync(service.IisSiteName, "stop", log, serviceId);
@@ -220,7 +225,7 @@ public class DeployLogic(
             await ManageIisSiteAsync(service.IisSiteName, "stop", log, serviceId);
 
         // PHASE 3: TRANSFER & START
-        var success = await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput);
+        var success = await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput, currentVersion);
 
         if (!success)
         {
@@ -234,7 +239,7 @@ public class DeployLogic(
         return success;
     }
 
-    private async Task<bool> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfigDB envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput)
+    private async Task<bool> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput, ProjectVersion? currentVersion = null)
     {
         var targetPath = envConfig.DeployTargetPath;
         if (string.IsNullOrWhiteSpace(targetPath))
@@ -268,6 +273,22 @@ public class DeployLogic(
 
         await log("SUCCESS", $"🚀 Deploy complete for: {service.Name}", service.Id);
 
+        if (currentVersion != null)
+        {
+            await log("INFO", $"📝 Recording version: {currentVersion.CommitHash[..7]} ({currentVersion.Branch})", service.Id);
+            await servicesLogic.UpdateVersionAsync(service.Id!, envConfig.EnvironmentId, currentVersion);
+
+            await deployHistoryLogic.AddAsync(new DeploymentHistoryDB
+            {
+                ServiceId = service.Id!,
+                EnvironmentId = envConfig.EnvironmentId,
+                Version = currentVersion,
+                ConfigSetIds = envConfig.ConfigSetIds,
+                CommitHash = currentVersion.CommitHash,
+                Created = DateTime.UtcNow
+            });
+        }
+
         if (!string.IsNullOrWhiteSpace(envConfig.HeartbeatUrl))
         {
             await CheckHeartbeatAsync(envConfig.HeartbeatUrl, log, service.Id);
@@ -276,7 +297,7 @@ public class DeployLogic(
         return true;
     }
 
-    private async Task ApplyEnvironmentConfigsAsync(ServiceEnvironmentConfigDB envConfig, VpsSettings? vps, string publishOutput, LogCallback log, string? serviceId)
+    private async Task ApplyEnvironmentConfigsAsync(ServiceEnvironmentConfig envConfig, VpsSettings? vps, string publishOutput, LogCallback log, string? serviceId)
     {
         // 1. Auto-rename based on Environment Tag (e.g. *.prod.json -> *.json)
         var envTag = vps?.EnvironmentTag;
@@ -396,7 +417,7 @@ public class DeployLogic(
         }
     }
 
-    private async Task ApplyJsonVariablesAsync(string targetFile, List<EnvVariableDB> variables, LogCallback log, string? serviceId, string type)
+    private async Task ApplyJsonVariablesAsync(string targetFile, List<EnvVariable> variables, LogCallback log, string? serviceId, string type)
     {
         try
         {
@@ -558,7 +579,7 @@ public class DeployLogic(
         }
     }
 
-    private static string GetEffectiveBranch(ServiceDefinitionDB service, ServiceEnvironmentConfigDB envConfig, string parsedBranch, string? branchOverride)
+    private static string GetEffectiveBranch(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, string parsedBranch, string? branchOverride)
     {
         if (!string.IsNullOrWhiteSpace(branchOverride)) return branchOverride;
         if (!string.IsNullOrWhiteSpace(envConfig.DefaultBranch)) return envConfig.DefaultBranch;

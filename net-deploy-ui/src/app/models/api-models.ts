@@ -30,6 +30,23 @@ export interface EnvConfigSet {
   variables: EnvVariable[];
 }
 
+export interface ProjectVersion {
+  commitHash: string;
+  commitMessage: string;
+  branch: string;
+  author: string;
+  updated: string | Date;
+}
+
+export interface DeploymentHistory {
+  id?: string;
+  serviceId: string;
+  environmentId: string;
+  created: string | Date;
+  version: ProjectVersion;
+  configSetIds: string[];
+}
+
 export interface ServiceDefinition {
   id?: string;
   name: string;
@@ -39,7 +56,7 @@ export interface ServiceDefinition {
   iisSiteName: string;
   serviceType: 'WebApi' | 'Mvc' | 'WindowsService' | 'Angular' | 'React';
   compileSingleFile: boolean;
-  lastDeployed?: string | Date;
+  updated?: string | Date;
   environments: ServiceEnvironmentConfig[];
   order?: number;
   _saved?: boolean; // UI state only
@@ -51,6 +68,7 @@ export interface ServiceEnvironmentConfig {
   heartbeatUrl: string;
   defaultBranch: string;
   configSetIds: string[];
+  currentVersion?: ProjectVersion;
 }
 
 export interface EnvVariable {
@@ -78,7 +96,7 @@ export interface ServiceHeartbeatStatus {
 export interface DeployLogEntry {
   id?: string;
   sessionId: string;
-  timestamp: string | Date;
+  created: string | Date;
   level: 'INFO' | 'SUCCESS' | 'ERROR' | 'WARNING' | 'DONE' | 'SESSION_ID';
   message: string;
   serviceId?: string;

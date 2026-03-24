@@ -104,7 +104,7 @@
   "noMatchingResults": "No matching results found.",
   "done": "Done",
   "status": "Status",
-  "lastDeploy": "Last Deploy",
+  "updated": "Updated",
   "type": "Type",
   "targetEnv": "Target Env:",
   "never": "Never",
@@ -158,5 +158,14 @@
   "success": "Success",
   "loadingMore": "Loading more...",
   "commercialUseNotice": "This software is for educational use only. Paid license is required for commercial use.",
-  "viewLicense": "View License"
+  "viewLicense": "View License",
+  "currentVersion": "Current Version",
+  "selectCommit": "Select Commit / Version",
+  "rollback": "Rollback",
+  "fromGit": "From Git",
+  "created": "Created At",
+  "history": "History",
+  "select": "Select",
+  "loadingCommits": "Loading commits...",
+  "commits": "Commits"
 }

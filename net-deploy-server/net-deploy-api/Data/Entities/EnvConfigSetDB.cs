@@ -1,7 +1,7 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace NET.Deploy.Api.Logic.Services.Entities;
+namespace NET.Deploy.Api.Data.Entities;
 
 [BsonIgnoreExtraElements]
 public class EnvConfigSetDB
@@ -12,9 +12,8 @@ public class EnvConfigSetDB
 
     public string Name { get; set; } = string.Empty;
 
-    public string SourceFileName { get; set; } = string.Empty;
-
-    public string TargetFileName { get; set; } = string.Empty;
+    public string? SourceFileName { get; set; }
+    public string? TargetFileName { get; set; }
 
     public List<EnvVariable> Variables { get; set; } = new();
 }

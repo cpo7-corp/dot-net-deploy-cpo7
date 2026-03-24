@@ -1,3 +1,5 @@
+using NET.Deploy.Api.Data.Entities;
+
 namespace NET.Deploy.Api.Logic.Services.Entities;
 
 public class ServiceStatus : ServiceDefinitionDB

@@ -1,7 +1,6 @@
 using MongoDB.Driver;
 using NET.Deploy.Api.Data;
-using NET.Deploy.Api.Logic.Settings.Entities;
-using NET.Deploy.Api.Logic.Services.Entities;
+using NET.Deploy.Api.Data.Entities;
 
 namespace NET.Deploy.Api.Logic.Maintenance;
 

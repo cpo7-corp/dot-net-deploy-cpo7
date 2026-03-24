@@ -1,7 +1,5 @@
 using MongoDB.Driver;
-using NET.Deploy.Api.Logic.DeployLogs.Entities;
-using NET.Deploy.Api.Logic.Services.Entities;
-using NET.Deploy.Api.Logic.Settings.Entities;
+using NET.Deploy.Api.Data.Entities;
 
 namespace NET.Deploy.Api.Data;
 
@@ -34,4 +32,7 @@ public class MongoDbContext
     /// <summary>Log lines written during deploy runs</summary>
     public IMongoCollection<DeployLogEntryDB> DeployLogs =>
         _database.GetCollection<DeployLogEntryDB>("deploy_logs");
+
+    public IMongoCollection<DeploymentHistoryDB> DeployHistory =>
+        _database.GetCollection<DeploymentHistoryDB>("deploy_history");
 }

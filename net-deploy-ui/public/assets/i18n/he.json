@@ -102,7 +102,7 @@
   "noMatchingResults": "לא נמצאו תוצאות תואמות.",
   "done": "סיום",
   "status": "סטטוס",
-  "lastDeploy": "פריסה אחרונה",
+  "updated": "עודכן לאחרונה",
   "type": "סוג",
   "targetEnv": "סביבת יעד:",
   "never": "מעולם לא",
@@ -156,5 +156,14 @@
   "success": "הצלחה",
   "loadingMore": "טוען עוד...",
   "commercialUseNotice": "התוכנה לשימוש לימודי בלבד. שימוש מסחרי מחייב רישיון בתשלום.",
-  "viewLicense": "צפה ברישיון"
+  "viewLicense": "צפה ברישיון",
+  "currentVersion": "גרסה נוכחית",
+  "selectCommit": "בחר גרסה / Commit",
+  "rollback": "Rollback / שחזור",
+  "fromGit": "מ-Git",
+  "created": "נוצר ב-",
+  "history": "היסטוריה",
+  "select": "בחר",
+  "loadingCommits": "טוען Commits...",
+  "commits": "Commits"
 }

@@ -1,7 +1,6 @@
-using NET.Deploy.Api.Logic.Settings.Entities;
-using System.Diagnostics;
+using NET.Deploy.Api.Data.Entities;
 using System.Collections.Concurrent;
-using System.Threading;
+using System.Diagnostics;
 
 namespace NET.Deploy.Api.Logic.Git;
 
@@ -17,7 +16,7 @@ public class GitLogic(ILogger<GitLogic> logger)
     {
         var repoDirName = GetSafeRepoName(repoUrl);
         var repoPath = Path.Combine(git.LocalBaseDir, repoDirName);
-        
+
         var @lock = GetRepoLock(repoPath);
         await @lock.WaitAsync();
 
@@ -83,7 +82,11 @@ public class GitLogic(ILogger<GitLogic> logger)
             if (!await RunGitAsync(repoPath, "fetch --all", "Fetch", log))
                 return false;
 
-            return await RunGitAsync(repoPath, $"reset --hard origin/{branch}", "Reset", log);
+            // If branch looks like a commit hash (7-40 chars hex), reset directly to it. Otherwise use origin prefix.
+            bool isHash = branch.Length >= 7 && branch.All(c => "0123456789abcdefABCDEF".Contains(c));
+            string resetCmd = isHash ? $"reset --hard {branch}" : $"reset --hard origin/{branch}";
+
+            return await RunGitAsync(repoPath, resetCmd, "Reset", log);
         }
         finally
         {
@@ -163,6 +166,73 @@ public class GitLogic(ILogger<GitLogic> logger)
             .ToList();
 
         return Task.FromResult(result);
+    }
+
+    public async Task<ProjectVersion?> GetCurrentCommitAsync(string repoLocalPath, string branch)
+    {
+        var result = await RunGitWithOutputAsync(repoLocalPath, $"log -1 --format=\"%H|%an|%at|%s\" {branch}");
+        if (string.IsNullOrWhiteSpace(result)) return null;
+
+        var parts = result.Split('|');
+        if (parts.Length < 4) return null;
+
+        if (!long.TryParse(parts[2], out var unixTime)) return null;
+
+        return new ProjectVersion
+        {
+            CommitHash = parts[0],
+            Author = parts[1],
+            Updated = DateTimeOffset.FromUnixTimeSeconds(unixTime).UtcDateTime,
+            CommitMessage = string.Join("|", parts.Skip(3)),
+            Branch = branch
+        };
+    }
+
+    public async Task<List<ProjectVersion>> ListRecentCommitsAsync(string repoLocalPath, string branch, int count = 20)
+    {
+        var result = await RunGitWithOutputAsync(repoLocalPath, $"log -{count} --format=\"%H|%an|%at|%s\" {branch}");
+        if (string.IsNullOrWhiteSpace(result)) return new();
+
+        var lines = result.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        var list = new List<ProjectVersion>();
+
+        foreach (var line in lines)
+        {
+            var parts = line.Split('|');
+            if (parts.Length < 4) continue;
+
+            if (!long.TryParse(parts[2], out var unixTime)) continue;
+
+            list.Add(new ProjectVersion
+            {
+                CommitHash = parts[0],
+                Author = parts[1],
+                Updated = DateTimeOffset.FromUnixTimeSeconds(unixTime).UtcDateTime,
+                CommitMessage = string.Join("|", parts.Skip(3)),
+                Branch = branch
+            });
+        }
+        return list;
+    }
+
+    private async Task<string> RunGitWithOutputAsync(string workingDir, string arguments)
+    {
+        if (!Directory.Exists(workingDir)) return "";
+
+        var gitExe = Deploy.ExeResolver.Resolve("git");
+        var psi = new ProcessStartInfo(gitExe, arguments)
+        {
+            WorkingDirectory = workingDir,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        using var process = Process.Start(psi);
+        if (process == null) return "";
+        var output = await process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync();
+        return output.Trim();
     }
 
     // ─────────────────────────────── helpers ───────────────────────────────

@@ -1,6 +1,6 @@
 using MongoDB.Driver;
 using NET.Deploy.Api.Data;
-using NET.Deploy.Api.Logic.Settings.Entities;
+using NET.Deploy.Api.Data.Entities;
 
 namespace NET.Deploy.Api.Logic.Settings;
 
@@ -13,7 +13,7 @@ public class SettingsLogic(MongoDbContext db)
     {
         Prepare(settings);
         var existing = await db.Settings.Find(_ => true).FirstOrDefaultAsync();
-        
+
         if (existing is null)
         {
             await db.Settings.InsertOneAsync(settings);
@@ -50,9 +50,10 @@ public class SettingsLogic(MongoDbContext db)
                 if (vps.SharedVariables != null)
                 {
                     vps.SharedVariables = vps.SharedVariables
-                        .Select(v => new NET.Deploy.Api.Logic.Services.Entities.EnvVariableDB { 
-                            Key = v.Key?.Trim() ?? string.Empty, 
-                            Value = v.Value?.Trim() ?? string.Empty 
+                        .Select(v => new EnvVariable
+                        {
+                            Key = v.Key?.Trim() ?? string.Empty,
+                            Value = v.Value?.Trim() ?? string.Empty
                         })
                         .Where(v => !string.IsNullOrWhiteSpace(v.Key))
                         .ToList();
@@ -61,9 +62,10 @@ public class SettingsLogic(MongoDbContext db)
                 if (vps.SharedFileRenames != null)
                 {
                     vps.SharedFileRenames = vps.SharedFileRenames
-                        .Select(f => new NET.Deploy.Api.Logic.Services.Entities.FileRenameDB { 
-                            SourceFileName = f.SourceFileName?.Trim() ?? string.Empty, 
-                            TargetFileName = f.TargetFileName?.Trim() ?? string.Empty 
+                        .Select(f => new FileRename
+                        {
+                            SourceFileName = f.SourceFileName?.Trim() ?? string.Empty,
+                            TargetFileName = f.TargetFileName?.Trim() ?? string.Empty
                         })
                         .Where(f => !string.IsNullOrWhiteSpace(f.SourceFileName))
                         .ToList();
