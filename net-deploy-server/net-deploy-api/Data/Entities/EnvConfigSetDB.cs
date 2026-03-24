@@ -12,8 +12,9 @@ public class EnvConfigSetDB
 
     public string Name { get; set; } = string.Empty;
 
-    public string? SourceFileName { get; set; }
-    public string? TargetFileName { get; set; }
+    public string SourceFileName { get; set; } = string.Empty;
+
+    public string TargetFileName { get; set; } = string.Empty;
 
     public List<EnvVariable> Variables { get; set; } = new();
 }

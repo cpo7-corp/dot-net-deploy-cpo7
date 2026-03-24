@@ -35,7 +35,7 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
                 IisSiteName = s.IisSiteName,
                 RepoUrl = s.RepoUrl,
                 ProjectPath = s.ProjectPath,
-                Updated = s.Updated,
+                LastDeployed = s.LastDeployed,
                 CompileSingleFile = s.CompileSingleFile,
                 Environments = s.Environments,
                 Status = status

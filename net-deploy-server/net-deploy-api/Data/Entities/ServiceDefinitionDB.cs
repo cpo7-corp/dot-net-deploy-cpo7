@@ -28,7 +28,7 @@ public class ServiceDefinitionDB
 
     public List<ServiceEnvironmentConfig> Environments { get; set; } = new();
 
-    public DateTime? Updated { get; set; }
+    public DateTime? LastDeployed { get; set; }
 
     public int Order { get; set; }
 }

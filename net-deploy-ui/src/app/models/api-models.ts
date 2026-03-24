@@ -56,7 +56,7 @@ export interface ServiceDefinition {
   iisSiteName: string;
   serviceType: 'WebApi' | 'Mvc' | 'WindowsService' | 'Angular' | 'React';
   compileSingleFile: boolean;
-  updated?: string | Date;
+  lastDeployed?: string | Date;
   environments: ServiceEnvironmentConfig[];
   order?: number;
   _saved?: boolean; // UI state only

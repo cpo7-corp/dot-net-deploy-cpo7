@@ -51,7 +51,7 @@
                   <tr class="text-secondary small">
                     <th class="ps-2">{{ 'name' | translate }}</th>
                     <th>{{ 'type' | translate }}</th>
-                    <th>{{ 'updated' | translate }}</th>
+                    <th>{{ 'lastDeploy' | translate }}</th>
                     <th>{{ 'status' | translate }}</th>
                     <th>{{ 'heartbeat' | translate }}</th>
                     <th class="text-end pe-4">{{ 'actions' | translate }}</th>
@@ -63,11 +63,11 @@
                       <td class="ps-2 fw-bold text-white" style="cursor: pointer;" (click)="openEditModal(s)">{{s.name}}</td>
                       <td><span class="badge bg-secondary opacity-75">{{s.serviceType}}</span></td>
                       <td>
-                        @if (!s.updated) {
+                        @if (!s.lastDeployed) {
                           <span class="text-secondary small">{{ 'never' | translate }}</span>
                         }
-                        @if (s.updated) {
-                          <span class="text-white-50 small">{{s.updated | date:'dd/MM/yyyy HH:mm'}}</span>
+                        @if (s.lastDeployed) {
+                          <span class="text-white-50 small">{{s.lastDeployed | date:'dd/MM/yyyy HH:mm'}}</span>
                         }
                       </td>
                       <td>

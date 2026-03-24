@@ -102,7 +102,7 @@
   "noMatchingResults": "לא נמצאו תוצאות תואמות.",
   "done": "סיום",
   "status": "סטטוס",
-  "updated": "עודכן לאחרונה",
+  "lastDeploy": "פריסה אחרונה",
   "type": "סוג",
   "targetEnv": "סביבת יעד:",
   "never": "מעולם לא",

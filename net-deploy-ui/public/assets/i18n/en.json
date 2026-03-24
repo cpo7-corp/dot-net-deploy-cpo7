@@ -104,7 +104,7 @@
   "noMatchingResults": "No matching results found.",
   "done": "Done",
   "status": "Status",
-  "updated": "Updated",
+  "lastDeploy": "Last Deploy",
   "type": "Type",
   "targetEnv": "Target Env:",
   "never": "Never",

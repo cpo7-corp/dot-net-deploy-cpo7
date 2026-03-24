@@ -66,7 +66,7 @@ public class ServicesLogic(MongoDbContext db)
     public async Task MarkDeployedAsync(string id)
     {
         var update = Builders<ServiceDefinitionDB>.Update
-            .Set(s => s.Updated, DateTime.UtcNow);
+            .Set(s => s.LastDeployed, DateTime.UtcNow);
 
         await db.Services.UpdateOneAsync(
             Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)),
@@ -82,7 +82,7 @@ public class ServicesLogic(MongoDbContext db)
 
         var update = Builders<ServiceDefinitionDB>.Update
             .Set("Environments.$.CurrentVersion", version)
-            .Set(s => s.Updated, DateTime.UtcNow);
+            .Set(s => s.LastDeployed, DateTime.UtcNow);
 
         await db.Services.UpdateOneAsync(filter, update);
     }
