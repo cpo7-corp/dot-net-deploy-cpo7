@@ -10,7 +10,7 @@ public class EnvConfigsLogic(MongoDbContext db)
         await db.EnvConfigSets.Find(_ => true).ToListAsync();
 
     public async Task<EnvConfigSetDB?> GetByIdAsync(string id) =>
-        await db.EnvConfigSets.Find(Builders<EnvConfigSetDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id))).FirstOrDefaultAsync();
+        await db.EnvConfigSets.Find(s => s.Id == id).FirstOrDefaultAsync();
 
     public async Task<EnvConfigSetDB> CreateAsync(EnvConfigSetDB config)
     {
@@ -25,7 +25,7 @@ public class EnvConfigsLogic(MongoDbContext db)
         Prepare(updated);
         updated.Id = id;
         var result = await db.EnvConfigSets.ReplaceOneAsync(
-            Builders<EnvConfigSetDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)),
+            Builders<EnvConfigSetDB>.Filter.Eq(s => s.Id, id),
             updated);
 
         return result.MatchedCount > 0 ? updated : null;
@@ -52,7 +52,7 @@ public class EnvConfigsLogic(MongoDbContext db)
     public async Task<bool> DeleteAsync(string id)
     {
         var result = await db.EnvConfigSets.DeleteOneAsync(
-            Builders<EnvConfigSetDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)));
+            Builders<EnvConfigSetDB>.Filter.Eq(s => s.Id, id));
 
         return result.DeletedCount > 0;
     }

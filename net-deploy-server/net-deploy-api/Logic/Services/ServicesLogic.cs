@@ -10,7 +10,7 @@ public class ServicesLogic(MongoDbContext db)
         await db.Services.Find(_ => true).SortBy(s => s.Order).ToListAsync();
 
     public async Task<ServiceDefinitionDB?> GetByIdAsync(string id) =>
-        await db.Services.Find(Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id))).FirstOrDefaultAsync();
+        await db.Services.Find(s => s.Id == id).FirstOrDefaultAsync();
 
     public async Task<ServiceDefinitionDB> CreateAsync(ServiceDefinitionDB service)
     {
@@ -25,7 +25,7 @@ public class ServicesLogic(MongoDbContext db)
         Prepare(updated);
         updated.Id = id;
         var result = await db.Services.ReplaceOneAsync(
-            Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)),
+            Builders<ServiceDefinitionDB>.Filter.Eq(s => s.Id, id),
             updated);
 
         return result.MatchedCount > 0 ? updated : null;
@@ -58,7 +58,7 @@ public class ServicesLogic(MongoDbContext db)
     public async Task<bool> DeleteAsync(string id)
     {
         var result = await db.Services.DeleteOneAsync(
-            Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)));
+            Builders<ServiceDefinitionDB>.Filter.Eq(s => s.Id, id));
 
         return result.DeletedCount > 0;
     }
@@ -69,14 +69,14 @@ public class ServicesLogic(MongoDbContext db)
             .Set(s => s.LastDeployed, DateTime.UtcNow);
 
         await db.Services.UpdateOneAsync(
-            Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(id)),
+            Builders<ServiceDefinitionDB>.Filter.Eq(s => s.Id, id),
             update);
     }
 
     public async Task UpdateVersionAsync(string serviceId, string environmentId, ProjectVersion version)
     {
         var filter = Builders<ServiceDefinitionDB>.Filter.And(
-            Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(serviceId)),
+            Builders<ServiceDefinitionDB>.Filter.Eq(s => s.Id, serviceId),
             Builders<ServiceDefinitionDB>.Filter.ElemMatch(s => s.Environments, e => e.EnvironmentId == environmentId)
         );
 
@@ -93,7 +93,7 @@ public class ServicesLogic(MongoDbContext db)
         {
             var update = Builders<ServiceDefinitionDB>.Update.Set(s => s.Order, i);
             await db.Services.UpdateOneAsync(
-                Builders<ServiceDefinitionDB>.Filter.Eq("_id", MongoDB.Bson.ObjectId.Parse(ids[i])),
+                Builders<ServiceDefinitionDB>.Filter.Eq(s => s.Id, ids[i]),
                 update);
         }
     }
