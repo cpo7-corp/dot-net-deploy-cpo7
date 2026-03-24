@@ -20,6 +20,7 @@ NET Deploy is a powerful tool designed to automate the process of pulling, build
 - **Heartbeat Monitoring**: Automatic health checks after deployment.
 - **Environment Variables Support**: Manage and update application settings during deployment.
 - **Batch Operations**: Prepare all repositories before starting transfers.
+- **Git Versioning & Rollback**: Browse commit history and rollback to previous versions of your services seamlessly.
 
 ## Getting Started
 
