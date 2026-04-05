@@ -8,6 +8,7 @@
     "start": "ng serve --port 5432",
     "build": "ng build",
     "prod": "ng build --configuration production",
+    "build:docker": "ng build --configuration docker",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },

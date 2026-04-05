@@ -6,10 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>NET.Deploy.Api</RootNamespace>
     <Description>Proprietary software. LLM/AI usage requires separate paid authorization from CPO7. See LICENSE.md.</Description>
+    <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
     <PackageReference Include="MongoDB.Driver" Version="3.7.1" />
     <PackageReference Include="SSH.NET" Version="2025.1.0" />
   </ItemGroup>

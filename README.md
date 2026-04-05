@@ -24,15 +24,31 @@ NET Deploy is a powerful tool designed to automate the process of pulling, build
 
 ## Getting Started
 
-### 1. Server Configuration
+### 🐋 Fast Track: Running with Docker (Recommended)
+The easiest way to get everything up and running is with **Docker Compose**. This will automatically start MongoDB, the API server, and the UI.
+
+1.  Make sure you have [Docker Desktop](https://www.docker.com/products/docker-desktop) installed and running.
+2.  Open a terminal in the project root.
+3.  Run:
+    ```bash
+    docker compose up -d --build
+
+    ```
+4.  Open your browser at [http://localhost:5432](http://localhost:5432).
+
+---
+
+### Manual Setup
+
+#### 1. Server Configuration
 - Ensure the API server (`net-deploy-api`) is running.
 - Configure your Git settings and VPS environments in the settings panel.
 
-### 2. UI Access
+#### 2. UI Access
 - Run the Angular UI on port `5432`.
 - Configure your services with their Repo URL and target paths.
 
-### 3. Deploy
+#### 3. Deploy
 - Select the services you want to deploy.
 - Choose the target environment.
 - Click **Deploy Selected** to start the automated process.

@@ -20,16 +20,15 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi();
 builder.Services.AddEndpointsApiExplorer();
 
-// CORS for Angular UI
+// CORS for UI
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? ["http://localhost:4200"];
-        policy.WithOrigins(allowedOrigins)
+        policy.SetIsOriginAllowed(_ => true) // Allow any origin in dev/docker
               .AllowAnyHeader()
               .AllowAnyMethod()
-              .AllowCredentials(); // needed for SSE stream if cookies are ever used
+              .AllowCredentials();
     });
 });
 

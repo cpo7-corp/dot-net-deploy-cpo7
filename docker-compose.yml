@@ -1,0 +1,40 @@
+version: '3.4'
+
+services:
+  api:
+    build:
+      context: ./net-deploy-server
+      dockerfile: ./net-deploy-api/Dockerfile
+    container_name: net-deploy-api
+    ports:
+      - "6234:80"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=docker
+      - ASPNETCORE_URLS=http://+:80
+    volumes:
+      - net-deploy-data:/app/data
+    networks:
+      - net-deploy-network
+    restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ui:
+    build:
+      context: ./net-deploy-ui
+      dockerfile: Dockerfile
+    container_name: net-deploy-ui
+    depends_on:
+      - api
+    ports:
+      - "5432:80"
+    networks:
+      - net-deploy-network
+    restart: always
+
+networks:
+  net-deploy-network:
+    driver: bridge
+
+volumes:
+  net-deploy-data:
