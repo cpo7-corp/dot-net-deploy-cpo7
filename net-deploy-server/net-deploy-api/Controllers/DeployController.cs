@@ -108,9 +108,9 @@ public class DeployController(
                               ?? new VpsSettings();
 
             var repoUpdateTasks = new ConcurrentDictionary<string, Task<bool>>();
-            var servicePrepTasks = new ConcurrentDictionary<string, Task<bool>>();
+            var servicePrepTasks = new ConcurrentDictionary<string, Task<(bool Success, double BuildSeconds)>>();
 
-            Task<bool> EnsureServicePrepared(ServiceDefinitionDB srv, string? branchOverride)
+            Task<(bool Success, double BuildSeconds)> EnsureServicePrepared(ServiceDefinitionDB srv, string? branchOverride)
             {
                 var envCfg = srv.Environments.FirstOrDefault(e => e.EnvironmentId == vpsSettings.Id);
                 var defaultBranch = envCfg?.DefaultBranch ?? "main";
@@ -119,6 +119,7 @@ public class DeployController(
 
                 return servicePrepTasks.GetOrAdd(prepKey, async _ =>
                 {
+                    var prepStart = DateTime.UtcNow;
                     var (repoUrl, gitBranch, _) = deployLogic.ParseGitUrl(srv.RepoUrl);
                     var effectiveRepoBranch = branchOverride ?? (string.IsNullOrWhiteSpace(envCfg?.DefaultBranch) ? gitBranch : envCfg.DefaultBranch);
                     var repoKey = $"{repoUrl}|{effectiveRepoBranch}";
@@ -127,8 +128,9 @@ public class DeployController(
                         deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, cts.Token)
                     );
 
-                    if (!repoUpdated) return false;
-                    return await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, skipBuildIfOutputExists: !request.Build, cts.Token);
+                    if (!repoUpdated) return (false, (DateTime.UtcNow - prepStart).TotalSeconds);
+                    var success = await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, skipBuildIfOutputExists: !request.Build, cts.Token);
+                    return (success, (DateTime.UtcNow - prepStart).TotalSeconds);
                 });
             }
 
@@ -161,9 +163,8 @@ public class DeployController(
                 results.Add(status);
                 var startTime = DateTime.UtcNow;
 
-                var stepStart = DateTime.UtcNow;
-                var prepSuccess = await EnsureServicePrepared(service, config.Branch);
-                status.BuildSeconds = (DateTime.UtcNow - stepStart).TotalSeconds;
+                var (prepSuccess, buildSeconds) = await EnsureServicePrepared(service, config.Branch);
+                status.BuildSeconds = buildSeconds;
                 status.Built = prepSuccess;
 
                 if (!prepSuccess) 
