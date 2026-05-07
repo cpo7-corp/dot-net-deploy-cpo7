@@ -137,6 +137,8 @@
   "deploymentSummary": "Deployment Summary",
   "totalTime": "Total Time",
   "buildTime": "Build Time",
+  "time": "Time",
+  "total": "Total",
   "environment": "Environment:",
   "git": "Git",
   "vps": "VPS",

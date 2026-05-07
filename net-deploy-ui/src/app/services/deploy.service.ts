@@ -11,7 +11,7 @@ export class DeployService extends ApiService {
   // State signals that persist across page navigation
   deploying = signal<boolean>(false);
   logs = signal<DeployLogEntry[]>([]);
-  deploymentProgress = signal<Record<string, { compiled: string; deployed: string; heartbeat: string; buildTime: string; buildStartTime?: number }>>({});
+  deploymentProgress = signal<Record<string, { compiled: string; deployed: string; heartbeat: string; buildTime: string; buildStartTime?: number; deployTime: string; deployStartTime?: number; heartbeatTime: string; heartbeatStartTime?: number }>>({});
   elapsedTime = signal<string>('00:00');
   failedServiceIds = signal<string[]>([]);
   currentSessionId = signal<string | null>(null);
@@ -46,7 +46,7 @@ export class DeployService extends ApiService {
     // Initialize progress
     const initialProgress: any = {};
     configs.forEach(c => {
-      initialProgress[c.serviceId] = { compiled: 'pending', deployed: 'pending', heartbeat: 'pending', buildTime: '' };
+      initialProgress[c.serviceId] = { compiled: 'pending', deployed: 'pending', heartbeat: 'pending', buildTime: '', deployTime: '', heartbeatTime: '' };
     });
     this.deploymentProgress.set(initialProgress);
     
@@ -105,12 +105,33 @@ export class DeployService extends ApiService {
         row.buildTime = ((Date.now() - row.buildStartTime) / 1000).toFixed(1) + 's';
       }
     }
-    if (message.includes('🚀 Uploading files') || message.includes('📂 Copying files')) row.deployed = 'process';
-    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied')) row.deployed = 'success';
+    if (message.includes('🚀 Uploading files') || message.includes('📂 Copying files')) {
+      row.deployed = 'process';
+      row.deployStartTime = Date.now();
+    }
+    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied')) {
+      row.deployed = 'success';
+      if (row.deployStartTime) {
+        row.deployTime = ((Date.now() - row.deployStartTime) / 1000).toFixed(1) + 's';
+      }
+    }
     if (message.includes('❌ Failed to transfer')) row.deployed = 'error';
-    if (message.includes('💓 Checking heartbeat')) row.heartbeat = 'process';
-    if (message.includes('✅ Heartbeat OK')) row.heartbeat = 'success';
-    if (message.includes('⚠️ Heartbeat returned error') || message.includes('❌ Heartbeat failed')) row.heartbeat = 'error';
+    if (message.includes('💓 Checking heartbeat')) {
+      row.heartbeat = 'process';
+      row.heartbeatStartTime = Date.now();
+    }
+    if (message.includes('✅ Heartbeat OK')) {
+      row.heartbeat = 'success';
+      if (row.heartbeatStartTime) {
+        row.heartbeatTime = ((Date.now() - row.heartbeatStartTime) / 1000).toFixed(1) + 's';
+      }
+    }
+    if (message.includes('⚠️ Heartbeat returned error') || message.includes('❌ Heartbeat failed')) {
+      row.heartbeat = 'error';
+      if (row.heartbeatStartTime) {
+        row.heartbeatTime = ((Date.now() - row.heartbeatStartTime) / 1000).toFixed(1) + 's';
+      }
+    }
 
     if (level === 'ERROR') {
       if (row.compiled === 'process' || row.compiled === 'pending') row.compiled = 'error';

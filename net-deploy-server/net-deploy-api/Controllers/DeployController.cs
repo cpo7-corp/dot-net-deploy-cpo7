@@ -132,6 +132,8 @@ public class DeployController(
                 });
             }
 
+            var sessionStartTime = DateTime.UtcNow;
+
             if (request.Pull)
             {
                 await Log("INFO", "🔍 [PHASE 1] Preparing all services (Pull, Build, Config)...");
@@ -159,7 +161,9 @@ public class DeployController(
                 results.Add(status);
                 var startTime = DateTime.UtcNow;
 
+                var stepStart = DateTime.UtcNow;
                 var prepSuccess = await EnsureServicePrepared(service, config.Branch);
+                status.BuildSeconds = (DateTime.UtcNow - stepStart).TotalSeconds;
                 status.Built = prepSuccess;
 
                 if (!prepSuccess) 
@@ -176,7 +180,10 @@ public class DeployController(
                     continue; 
                 }
 
+                stepStart = DateTime.UtcNow;
                 var deployResult = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, skipBuildIfOutputExists: true, cts.Token);
+                status.DeploySeconds = deployResult.TransferSeconds;
+                status.HeartbeatSeconds = deployResult.HeartbeatSeconds;
                 status.Deployed = deployResult.Success;
                 status.Heartbeat = deployResult.Heartbeat;
                 status.Duration = DateTime.UtcNow - startTime;
@@ -188,18 +195,23 @@ public class DeployController(
 
             await Log("INFO", "──────────────────────────────────────────────────");
             await Log("INFO", "📊 DEPLOYMENT SUMMARY:");
-            await Log("INFO", $"{"Service Name".PadRight(25)} | {"Build".PadRight(8)} | {"Deployed".PadRight(8)} | {"Heartbeat".PadRight(10)} | {"Time".PadRight(8)}");
-            await Log("INFO", new string('─', 70));
+            await Log("INFO", $"{"Service Name".PadRight(25)} | {"Build".PadRight(12)} | {"Deployed".PadRight(12)} | {"Heartbeat".PadRight(10)} | {"Time".PadRight(8)}");
+            await Log("INFO", new string('─', 80));
 
             foreach (var s in results)
             {
-                var builtStr = s.Built == true ? "✅ OK" : (s.Built == false ? "❌ FAIL" : "➖");
-                var deployStr = s.Deployed == true ? "✅ OK" : (s.Deployed == false ? "❌ FAIL" : "➖");
-                var heartStr = s.Heartbeat == true ? "💚 OK" : (s.Heartbeat == false ? "💔 FAIL" : "➖");
-                var timeStr = $"{(int)s.Duration.TotalMinutes}m {s.Duration.Seconds}s";
+                var builtStr = s.Built == true ? $"✅ OK ({(int)s.BuildSeconds}s)" : (s.Built == false ? "❌ FAIL" : "➖");
+                var deployStr = s.Deployed == true ? $"✅ OK ({(int)s.DeploySeconds}s)" : (s.Deployed == false ? "❌ FAIL" : "➖");
+                var heartStr = s.Heartbeat == true ? $"💚 OK ({(int)s.HeartbeatSeconds}s)" : (s.Heartbeat == false ? "💔 FAIL" : "➖");
+                var timeStr = $"{(int)s.Duration.TotalSeconds}s";
 
-                await Log("INFO", $"{s.Name.PadRight(25)} | {builtStr.PadRight(8)} | {deployStr.PadRight(8)} | {heartStr.PadRight(10)} | {timeStr.PadRight(8)}");
+                await Log("INFO", $"{s.Name.PadRight(25)} | {builtStr.PadRight(12)} | {deployStr.PadRight(12)} | {heartStr.PadRight(10)} | {timeStr.PadRight(8)}");
             }
+
+            var totalDuration = DateTime.UtcNow - sessionStartTime;
+            await Log("INFO", new string('─', 80));
+            await Log("INFO", $"TOTAL TIME: {totalDuration.TotalSeconds:F1}s");
+            await Log("INFO", new string('─', 80));
 
             var successCount = results.Count(r => r.Deployed == true || (r.Deployed == null && r.Built == true));
             var level = successCount == results.Count ? "SUCCESS" : (successCount == 0 ? "ERROR" : "WARNING");
@@ -268,8 +280,11 @@ public class DeployController(
     {
         public string Name { get; set; } = "";
         public bool? Built { get; set; }
+        public double BuildSeconds { get; set; }
         public bool? Deployed { get; set; }
+        public double DeploySeconds { get; set; }
         public bool? Heartbeat { get; set; }
+        public double HeartbeatSeconds { get; set; }
         public TimeSpan Duration { get; set; }
     }
 }

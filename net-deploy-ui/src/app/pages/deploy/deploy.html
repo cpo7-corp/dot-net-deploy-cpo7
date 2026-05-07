@@ -244,6 +244,7 @@
                 <th class="text-center">{{ 'build' | translate }}</th>
                 <th class="text-center">{{ 'deployed' | translate }}</th>
                 <th class="text-center">{{ 'heartbeat' | translate }}</th>
+                <th class="text-center">{{ 'time' | translate }}</th>
               </tr>
             </thead>
             <tbody>
@@ -260,16 +261,40 @@
                   </div>
                 </td>
                 <td class="text-center">
-                  <ng-container [ngTemplateOutlet]="statusIcon"
-                    [ngTemplateOutletContext]="{ status: deploymentProgress()[id].deployed }"></ng-container>
+                  <div class="d-flex align-items-center justify-content-center gap-2">
+                    <ng-container [ngTemplateOutlet]="statusIcon"
+                      [ngTemplateOutletContext]="{ status: deploymentProgress()[id].deployed }"></ng-container>
+                    @if (deploymentProgress()[id].deployTime) {
+                    <span class="text-secondary smaller opacity-75">({{ deploymentProgress()[id].deployTime }})</span>
+                    }
+                  </div>
                 </td>
                 <td class="text-center">
-                  <ng-container [ngTemplateOutlet]="statusIcon"
-                    [ngTemplateOutletContext]="{ status: deploymentProgress()[id].heartbeat }"></ng-container>
+                  <div class="d-flex align-items-center justify-content-center gap-2">
+                    <ng-container [ngTemplateOutlet]="statusIcon"
+                      [ngTemplateOutletContext]="{ status: deploymentProgress()[id].heartbeat }"></ng-container>
+                    @if (deploymentProgress()[id].heartbeatTime) {
+                    <span class="text-secondary smaller opacity-75">({{ deploymentProgress()[id].heartbeatTime }})</span>
+                    }
+                  </div>
+                </td>
+                <td class="text-center text-secondary smaller opacity-75">
+                  @if (deploymentProgress()[id].buildTime || deploymentProgress()[id].deployTime) {
+                  {{ calculateTotalTime(deploymentProgress()[id]) }}
+                  }
                 </td>
               </tr>
               }
             </tbody>
+            <tfoot class="border-top-0">
+              <tr class="bg-dark bg-opacity-50 fw-bold border-top border-secondary">
+                <td class="ps-3 py-2 text-secondary">{{ 'total' | translate }}</td>
+                <td class="text-center text-secondary small">{{ getTotalPhaseTime('compiled') }}</td>
+                <td class="text-center text-secondary small">{{ getTotalPhaseTime('deployed') }}</td>
+                <td class="text-center text-secondary small">{{ getTotalPhaseTime('heartbeat') }}</td>
+                <td class="text-center text-info">{{ getTotalAllServicesTime() }}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </div>

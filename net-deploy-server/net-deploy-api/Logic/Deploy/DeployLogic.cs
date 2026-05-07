@@ -126,7 +126,7 @@ public class DeployLogic(
     }
 
 
-    public async Task<(bool Success, bool? Heartbeat)> DeployServiceAsync(
+    public async Task<(bool Success, bool? Heartbeat, double TransferSeconds, double HeartbeatSeconds)> DeployServiceAsync(
         ServiceDefinitionDB service,
         AppSettingsDB settings,
         LogCallback log,
@@ -166,7 +166,7 @@ public class DeployLogic(
             }
         }
 
-        return (false, null);
+        return (false, null, 0, 0);
     }
 
     public async Task<bool> PrepGitOnlyAsync(
@@ -187,7 +187,7 @@ public class DeployLogic(
         return await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean, ct);
     }
 
-    private async Task<(bool Success, bool? Heartbeat)> DeployServiceInternalAsync(
+    private async Task<(bool Success, bool? Heartbeat, double TransferSeconds, double HeartbeatSeconds)> DeployServiceInternalAsync(
         ServiceDefinitionDB service,
         AppSettingsDB settings,
         LogCallback log,
@@ -201,14 +201,14 @@ public class DeployLogic(
     {
         var serviceId = service.Id;
         var envConfig = service.Environments.FirstOrDefault(e => e.EnvironmentId == environmentId);
-        if (envConfig == null) return (false, null);
+        if (envConfig == null) return (false, null, 0, 0);
 
         var publishOutput = Path.Combine(Path.GetTempPath(), "net-deploy", service.Id ?? service.Name);
         var isWindowsService = service.ServiceType == "WindowsService";
 
         // PHASE 1: PREPARATION (Pull, Build, Config)
         bool prepSuccess = await PrepAndBuildServiceAsync(service, settings, log, environmentId, branchOverride, forceClean, skipPull, skipBuildIfOutputExists, ct);
-        if (!prepSuccess) return (false, null);
+        if (!prepSuccess) return (false, null, 0, 0);
 
         // NEW: Get current commit info
         ProjectVersion? currentVersion = null;
@@ -246,14 +246,16 @@ public class DeployLogic(
         return result;
     }
 
-    private async Task<(bool Success, bool? Heartbeat)> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput, ProjectVersion? currentVersion = null, System.Threading.CancellationToken ct = default)
+    private async Task<(bool Success, bool? Heartbeat, double TransferSeconds, double HeartbeatSeconds)> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput, ProjectVersion? currentVersion = null, System.Threading.CancellationToken ct = default)
     {
         var targetPath = envConfig.DeployTargetPath;
         if (string.IsNullOrWhiteSpace(targetPath))
         {
             await log("ERROR", "❌ Missing DeployTargetPath for service environment.", service.Id);
-            return (false, null);
+            return (false, null, 0, 0);
         }
+
+        var transferStart = DateTime.UtcNow;
 
         try
         {
@@ -270,8 +272,10 @@ public class DeployLogic(
 
             await log("ERROR", $"❌ Transfer failed after all attempts: {ex.Message}", service.Id);
             logger.LogError(ex, "Failed to copy/upload files to {Target}", targetPath);
-            return (false, null);
+            return (false, null, 0, 0);
         }
+
+        var transferDuration = (DateTime.UtcNow - transferStart).TotalSeconds;
 
         if (isWindowsService)
             await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id, targetPath);
@@ -297,12 +301,14 @@ public class DeployLogic(
         }
 
         bool? heartbeatSuccess = null;
+        var heartbeatStart = DateTime.UtcNow;
         if (!string.IsNullOrWhiteSpace(envConfig.HeartbeatUrl))
         {
             heartbeatSuccess = await CheckHeartbeatAsync(envConfig.HeartbeatUrl, log, service.Id);
         }
+        var heartbeatDuration = (DateTime.UtcNow - heartbeatStart).TotalSeconds;
 
-        return (true, heartbeatSuccess);
+        return (true, heartbeatSuccess, transferDuration, heartbeatDuration);
     }
 
     private async Task ApplyEnvironmentConfigsAsync(ServiceEnvironmentConfig envConfig, VpsSettings? vps, string publishOutput, LogCallback log, string? serviceId)

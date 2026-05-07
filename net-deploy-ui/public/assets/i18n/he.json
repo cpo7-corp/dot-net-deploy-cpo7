@@ -135,6 +135,8 @@
   "deploymentSummary": "סיכום פריסה",
   "totalTime": "זמן כולל",
   "buildTime": "זמן בנייה",
+  "time": "זמן",
+  "total": "סה\"כ",
   "environment": "סביבה:",
   "git": "Git",
   "vps": "VPS",

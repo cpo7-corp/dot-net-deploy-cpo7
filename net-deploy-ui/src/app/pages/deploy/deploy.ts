@@ -208,8 +208,37 @@ export class DeployComponent implements OnInit {
   }
 
   getServiceName(id: string) { 
-    return this.services().find(s => s.id === id)?.name || 'Unknown'; 
+    return this.services().find(s => s.id === id)?.name || 'Unknown';
   }
+
+  calculateTotalTime(progress: any): string {
+    const build = parseFloat(progress.buildTime || '0');
+    const deploy = parseFloat(progress.deployTime || '0');
+    const heartbeat = parseFloat(progress.heartbeatTime || '0');
+    const total = build + deploy + heartbeat;
+    return total > 0 ? total.toFixed(1) + 's' : '';
+  }
+
+  getTotalPhaseTime(phase: 'compiled' | 'deployed' | 'heartbeat'): string {
+    const progress = this.deploymentProgress();
+    let total = 0;
+    for (const key in progress) {
+      const p = progress[key];
+      const timeStr = phase === 'compiled' ? p.buildTime : (phase === 'deployed' ? p.deployTime : p.heartbeatTime);
+      total += parseFloat(timeStr || '0');
+    }
+    return total > 0 ? total.toFixed(1) + 's' : '';
+  }
+
+  getTotalAllServicesTime(): string {
+    const progress = this.deploymentProgress();
+    let total = 0;
+    for (const key in progress) {
+      total += parseFloat(this.calculateTotalTime(progress[key]) || '0');
+    }
+    return total > 0 ? total.toFixed(1) + 's' : '';
+  } 
+
 
   getLogClass(level: string): string {
     return `log-${level.toLowerCase()}`;

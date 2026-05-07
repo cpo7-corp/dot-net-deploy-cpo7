@@ -2,12 +2,14 @@ using NET.Deploy.Api.Data.Entities;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 
 namespace NET.Deploy.Api.Logic.Git;
 
 public class GitLogic(ILogger<GitLogic> logger)
 {
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> _repoLocks = new();
+    private static int _isCleaningUp = 0;
     private static SemaphoreSlim GetRepoLock(string path) => _repoLocks.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
 
     /// <summary>
@@ -100,32 +102,48 @@ public class GitLogic(ILogger<GitLogic> logger)
 
     private void CleanupStaleDeletedDirectories(string baseDir, string? excludeDir = null)
     {
-        try
+        // If cleanup is already running, return immediately to avoid delaying the current deployment.
+        if (Interlocked.CompareExchange(ref _isCleaningUp, 1, 0) != 0) return;
+
+        _ = Task.Run(() =>
         {
-            if (!Directory.Exists(baseDir)) return;
-            var dirs = Directory.GetDirectories(baseDir);
-            var now = DateTime.Now;
-
-            foreach (var dir in dirs)
+            try
             {
-                // Don't delete the directory we are currently working on
-                if (excludeDir != null && string.Equals(Path.GetFullPath(dir), Path.GetFullPath(excludeDir), StringComparison.OrdinalIgnoreCase))
-                    continue;
+                if (!Directory.Exists(baseDir)) return;
+                var dirs = Directory.GetDirectories(baseDir);
+                var now = DateTime.Now;
 
-                var creationTime = Directory.GetCreationTime(dir);
-                bool isDelFolder = dir.Contains("_del_");
-
-                // Cleanup logic:
-                // 1. Temporary folders (*_del_*) older than 10 minutes (failed deletions)
-                // 2. Any folder older than 24 hours (as requested: creation date > 1 day)
-                if ((isDelFolder && creationTime < now.AddMinutes(-10)) ||
-                    (!isDelFolder && creationTime < now.AddDays(-1)))
+                foreach (var dir in dirs)
                 {
-                    _ = Task.Run(() => DeleteDirectoryRecursivelyInternal(dir));
+                    var fullPath = Path.GetFullPath(dir);
+
+                    // 1. Don't delete the directory we are currently working on in the calling thread
+                    if (excludeDir != null && string.Equals(fullPath, Path.GetFullPath(excludeDir), StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    // 2. Safety: Don't delete a directory that has an active lock (currently being used by another deployment)
+                    if (_repoLocks.TryGetValue(fullPath, out var sem) && sem.CurrentCount == 0)
+                        continue;
+
+                    var creationTime = Directory.GetCreationTime(dir);
+                    bool isDelFolder = dir.Contains("_del_");
+
+                    // Cleanup logic:
+                    // 1. Temporary folders (*_del_*) older than 10 minutes (failed deletions)
+                    // 2. Any folder older than 24 hours (as requested: creation date > 1 day)
+                    if ((isDelFolder && creationTime < now.AddMinutes(-10)) ||
+                        (!isDelFolder && creationTime < now.AddDays(-1)))
+                    {
+                        DeleteDirectoryRecursivelyInternal(dir);
+                    }
                 }
             }
-        }
-        catch { }
+            catch { }
+            finally
+            {
+                Interlocked.Exchange(ref _isCleaningUp, 0);
+            }
+        });
     }
 
     private void DeleteDirectoryRecursively(string path)
