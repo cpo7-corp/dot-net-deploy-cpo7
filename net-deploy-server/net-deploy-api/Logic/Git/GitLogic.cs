@@ -26,8 +26,8 @@ public class GitLogic(ILogger<GitLogic> logger)
             // Ensure base directory exists
             Directory.CreateDirectory(git.LocalBaseDir);
 
-            // Cleanup any stale temporary folders from previous failed deletions
-            CleanupStaleDeletedDirectories(git.LocalBaseDir);
+            // Cleanup any stale temporary folders or old clones (> 1 day)
+            CleanupStaleDeletedDirectories(git.LocalBaseDir, repoPath);
 
             var authUrl = BuildAuthUrl(git, repoUrl);
 
@@ -98,16 +98,28 @@ public class GitLogic(ILogger<GitLogic> logger)
         }
     }
 
-    private void CleanupStaleDeletedDirectories(string baseDir)
+    private void CleanupStaleDeletedDirectories(string baseDir, string? excludeDir = null)
     {
         try
         {
             if (!Directory.Exists(baseDir)) return;
-            var dirs = Directory.GetDirectories(baseDir, "*_del_*");
+            var dirs = Directory.GetDirectories(baseDir);
+            var now = DateTime.Now;
+
             foreach (var dir in dirs)
             {
-                // Only try to delete if it's older than 10 minutes (to avoid deleting folders currently being processed)
-                if (Directory.GetCreationTime(dir) < DateTime.Now.AddMinutes(-10))
+                // Don't delete the directory we are currently working on
+                if (excludeDir != null && string.Equals(Path.GetFullPath(dir), Path.GetFullPath(excludeDir), StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                var creationTime = Directory.GetCreationTime(dir);
+                bool isDelFolder = dir.Contains("_del_");
+
+                // Cleanup logic:
+                // 1. Temporary folders (*_del_*) older than 10 minutes (failed deletions)
+                // 2. Any folder older than 24 hours (as requested: creation date > 1 day)
+                if ((isDelFolder && creationTime < now.AddMinutes(-10)) ||
+                    (!isDelFolder && creationTime < now.AddDays(-1)))
                 {
                     _ = Task.Run(() => DeleteDirectoryRecursivelyInternal(dir));
                 }
