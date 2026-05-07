@@ -5,11 +5,12 @@ namespace NET.Deploy.Api.Logic.Deploy;
 
 public class TransferManager
 {
-    public async Task<bool> TransferAsync(string localPath, string remotePath, VpsSettings? vps, LogCallback log, string? serviceId)
+    public async Task<bool> TransferAsync(string localPath, string remotePath, VpsSettings? vps, LogCallback log, string? serviceId, System.Threading.CancellationToken ct = default)
     {
         const int maxTransferAttempts = 3;
         for (int attempt = 1; attempt <= maxTransferAttempts; attempt++)
         {
+            ct.ThrowIfCancellationRequested();
             try
             {
                 if (vps != null && !vps.IsLocal && !string.IsNullOrWhiteSpace(vps.Host) && vps.Host != "localhost" && vps.Host != "127.0.0.1")
@@ -17,7 +18,7 @@ public class TransferManager
                     if (attempt > 1) await log("WARNING", $"🔄 Retrying upload ({attempt}/{maxTransferAttempts})...", serviceId);
                     else await log("INFO", $"🚀 Uploading files to remote VPS: {vps.Host} at {remotePath}...", serviceId);
 
-                    await UploadDirectoryToRemoteAsync(localPath, remotePath, vps, log, serviceId);
+                    await UploadDirectoryToRemoteAsync(localPath, remotePath, vps, log, serviceId, ct);
                     await log("SUCCESS", $"✅ Files uploaded to remote: {vps.Host}", serviceId);
                 }
                 else
@@ -59,7 +60,7 @@ public class TransferManager
         return false;
     }
 
-    private async Task UploadDirectoryToRemoteAsync(string localPath, string remotePath, VpsSettings vps, LogCallback log, string? serviceId)
+    private async Task UploadDirectoryToRemoteAsync(string localPath, string remotePath, VpsSettings vps, LogCallback log, string? serviceId, System.Threading.CancellationToken ct)
     {
         await log("INFO", $"[SFTP] Attempting connect to Host: '{vps.Host}', Username: '{vps.Username}'", serviceId);
 
@@ -98,6 +99,7 @@ public class TransferManager
                 }
                 foreach (var subDir in Directory.GetDirectories(localDir))
                 {
+                    ct.ThrowIfCancellationRequested();
                     await UploadSf(subDir, remoteDir + "/" + Path.GetFileName(subDir));
                 }
             }

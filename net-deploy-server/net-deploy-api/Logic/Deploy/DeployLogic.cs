@@ -31,7 +31,8 @@ public class DeployLogic(
         string? branchOverride = null,
         bool forceClean = false,
         bool skipPull = false,
-        bool skipBuildIfOutputExists = false)
+        bool skipBuildIfOutputExists = false,
+        System.Threading.CancellationToken ct = default)
     {
         var envConfig = service.Environments.FirstOrDefault(e => e.EnvironmentId == environmentId);
         if (envConfig == null)
@@ -58,14 +59,14 @@ public class DeployLogic(
 
         // LOCK START: Ensure only one service works on this repository folder at a time
         var @lock = GetRepoLock(repoLocalPath);
-        await @lock.WaitAsync();
+        await @lock.WaitAsync(ct);
 
         try
         {
             if (!skipPull)
             {
                 await log("INFO", $"📥 [Prep] Pulling latest for {service.Name} ({effectiveBranch})...", service.Id);
-                if (!await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean))
+                if (!await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean, ct))
                     return false;
             }
 
@@ -75,7 +76,7 @@ public class DeployLogic(
             }
 
             await log("INFO", $"🔨 [Prep] Building & publishing {service.Name}...", service.Id);
-            bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, service.Id);
+            bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, service.Id, ct);
 
             if (buildSuccess)
             {
@@ -125,7 +126,7 @@ public class DeployLogic(
     }
 
 
-    public async Task<bool> DeployServiceAsync(
+    public async Task<(bool Success, bool? Heartbeat)> DeployServiceAsync(
         ServiceDefinitionDB service,
         AppSettingsDB settings,
         LogCallback log,
@@ -134,7 +135,8 @@ public class DeployLogic(
         VpsSettings? vpsOverride = null,
         bool forceClean = false,
         bool skipPull = false,
-        bool skipBuildIfOutputExists = false)
+        bool skipBuildIfOutputExists = false,
+        System.Threading.CancellationToken ct = default)
     {
         var serviceId = service.Id;
         const int maxRetries = 3;
@@ -144,14 +146,14 @@ public class DeployLogic(
             if (attempt > 1)
             {
                 await log("WARNING", $"🔄 Retry attempt {attempt}/{maxRetries} for {service.Name}...", serviceId);
-                await Task.Delay(5000);
+                await Task.Delay(5000, ct);
             }
 
             try
             {
                 var effectiveClean = attempt == 1 && forceClean;
-                var success = await DeployServiceInternalAsync(service, settings, log, environmentId, branchOverride, vpsOverride, effectiveClean, skipPull, skipBuildIfOutputExists || attempt > 1);
-                if (success) return true;
+                var result = await DeployServiceInternalAsync(service, settings, log, environmentId, branchOverride, vpsOverride, effectiveClean, skipPull, skipBuildIfOutputExists || attempt > 1, ct);
+                if (result.Success) return result;
             }
             catch (Exception ex)
             {
@@ -164,7 +166,7 @@ public class DeployLogic(
             }
         }
 
-        return false;
+        return (false, null);
     }
 
     public async Task<bool> PrepGitOnlyAsync(
@@ -173,7 +175,8 @@ public class DeployLogic(
         LogCallback log,
         string environmentId,
         string? branchOverride = null,
-        bool forceClean = false)
+        bool forceClean = false,
+        System.Threading.CancellationToken ct = default)
     {
         var envConfig = service.Environments.FirstOrDefault(e => e.EnvironmentId == environmentId);
         var (repoUrl, gitBranch, projectPath) = gitLogic.ParseGitUrl(service.RepoUrl);
@@ -181,10 +184,10 @@ public class DeployLogic(
         var effectiveProjectPath = NormalizePath(GetEffectiveProjectPath(service, projectPath));
 
         await log("INFO", $"📥 [Prep] Pulling Git for {service.Name} ({effectiveBranch})...", service.Id);
-        return await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean);
+        return await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean, ct);
     }
 
-    private async Task<bool> DeployServiceInternalAsync(
+    private async Task<(bool Success, bool? Heartbeat)> DeployServiceInternalAsync(
         ServiceDefinitionDB service,
         AppSettingsDB settings,
         LogCallback log,
@@ -193,18 +196,19 @@ public class DeployLogic(
         VpsSettings? vpsOverride,
         bool forceClean,
         bool skipPull,
-        bool skipBuildIfOutputExists)
+        bool skipBuildIfOutputExists,
+        System.Threading.CancellationToken ct)
     {
         var serviceId = service.Id;
         var envConfig = service.Environments.FirstOrDefault(e => e.EnvironmentId == environmentId);
-        if (envConfig == null) return false;
+        if (envConfig == null) return (false, null);
 
         var publishOutput = Path.Combine(Path.GetTempPath(), "net-deploy", service.Id ?? service.Name);
         var isWindowsService = service.ServiceType == "WindowsService";
 
         // PHASE 1: PREPARATION (Pull, Build, Config)
-        bool prepSuccess = await PrepAndBuildServiceAsync(service, settings, log, environmentId, branchOverride, forceClean, skipPull, skipBuildIfOutputExists);
-        if (!prepSuccess) return false;
+        bool prepSuccess = await PrepAndBuildServiceAsync(service, settings, log, environmentId, branchOverride, forceClean, skipPull, skipBuildIfOutputExists, ct);
+        if (!prepSuccess) return (false, null);
 
         // NEW: Get current commit info
         ProjectVersion? currentVersion = null;
@@ -224,10 +228,13 @@ public class DeployLogic(
         else if (service.ServiceType is "WebApi" or "Mvc")
             await ManageIisSiteAsync(service.IisSiteName, "stop", log, serviceId);
 
-        // PHASE 3: TRANSFER & START
-        var success = await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput, currentVersion);
+        // EXTRA: Force kill any remaining processes holding files in target directory
+        await processRunner.KillProcessesInDirectory(envConfig.DeployTargetPath, log, serviceId);
 
-        if (!success)
+        // PHASE 3: TRANSFER & START
+        var result = await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput, currentVersion, ct);
+
+        if (!result.Success)
         {
             // Restore service if transfer failed
             if (isWindowsService)
@@ -236,21 +243,21 @@ public class DeployLogic(
                 await ManageIisSiteAsync(service.IisSiteName, "start", log, serviceId);
         }
 
-        return success;
+        return result;
     }
 
-    private async Task<bool> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput, ProjectVersion? currentVersion = null)
+    private async Task<(bool Success, bool? Heartbeat)> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput, ProjectVersion? currentVersion = null, System.Threading.CancellationToken ct = default)
     {
         var targetPath = envConfig.DeployTargetPath;
         if (string.IsNullOrWhiteSpace(targetPath))
         {
             await log("ERROR", "❌ Missing DeployTargetPath for service environment.", service.Id);
-            return false;
+            return (false, null);
         }
 
         try
         {
-            var transferred = await transferManager.TransferAsync(publishOutput, targetPath, vpsOverride, log, service.Id);
+            var transferred = await transferManager.TransferAsync(publishOutput, targetPath, vpsOverride, log, service.Id, ct);
             if (!transferred) throw new Exception("Transfer manager reported failure.");
         }
         catch (Exception ex)
@@ -263,7 +270,7 @@ public class DeployLogic(
 
             await log("ERROR", $"❌ Transfer failed after all attempts: {ex.Message}", service.Id);
             logger.LogError(ex, "Failed to copy/upload files to {Target}", targetPath);
-            return false;
+            return (false, null);
         }
 
         if (isWindowsService)
@@ -289,12 +296,13 @@ public class DeployLogic(
             });
         }
 
+        bool? heartbeatSuccess = null;
         if (!string.IsNullOrWhiteSpace(envConfig.HeartbeatUrl))
         {
-            await CheckHeartbeatAsync(envConfig.HeartbeatUrl, log, service.Id);
+            heartbeatSuccess = await CheckHeartbeatAsync(envConfig.HeartbeatUrl, log, service.Id);
         }
 
-        return true;
+        return (true, heartbeatSuccess);
     }
 
     private async Task ApplyEnvironmentConfigsAsync(ServiceEnvironmentConfig envConfig, VpsSettings? vps, string publishOutput, LogCallback log, string? serviceId)
@@ -560,7 +568,7 @@ public class DeployLogic(
         if (action == "stop") await Task.Delay(3000);
     }
 
-    private async Task CheckHeartbeatAsync(string url, LogCallback log, string? serviceId)
+    private async Task<bool> CheckHeartbeatAsync(string url, LogCallback log, string? serviceId)
     {
         await log("INFO", $"💓 Checking heartbeat: {url} ...", serviceId);
         try
@@ -569,13 +577,20 @@ public class DeployLogic(
             client.Timeout = TimeSpan.FromSeconds(15);
             var response = await client.GetAsync(url);
             if (response.IsSuccessStatusCode)
+            {
                 await log("SUCCESS", $"✅ Heartbeat OK! Status: {response.StatusCode}", serviceId);
+                return true;
+            }
             else
+            {
                 await log("WARNING", $"⚠️ Heartbeat returned error: {response.StatusCode}", serviceId);
+                return false;
+            }
         }
         catch (Exception ex)
         {
             await log("ERROR", $"❌ Heartbeat failed: {ex.Message}", serviceId);
+            return false;
         }
     }
 

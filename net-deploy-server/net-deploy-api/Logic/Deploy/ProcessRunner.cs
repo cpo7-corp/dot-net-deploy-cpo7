@@ -4,7 +4,7 @@ namespace NET.Deploy.Api.Logic.Deploy;
 
 public class ProcessRunner
 {
-    public async Task<bool> RunAsync(string command, string arguments, string workingDir, LogCallback log, string? serviceId)
+    public async Task<bool> RunAsync(string command, string arguments, string workingDir, LogCallback log, string? serviceId, System.Threading.CancellationToken ct = default)
     {
         var resolvedCommand = ExeResolver.Resolve(command);
         var psi = new ProcessStartInfo(resolvedCommand, arguments)
@@ -21,7 +21,16 @@ public class ProcessRunner
 
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        
+        try
+        {
+            await process.WaitForExitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            try { process.Kill(true); } catch { }
+            throw;
+        }
 
         var stdout = await outputTask;
         var stderr = await errorTask;
@@ -55,5 +64,43 @@ public class ProcessRunner
         }
 
         return true;
+    }
+
+    public async Task KillProcessesInDirectory(string directory, LogCallback log, string? serviceId)
+    {
+        if (string.IsNullOrWhiteSpace(directory) || !Directory.Exists(directory)) return;
+
+        var fullPath = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var processes = Process.GetProcesses();
+        int killedCount = 0;
+
+        foreach (var proc in processes)
+        {
+            try
+            {
+                if (proc.Id == Process.GetCurrentProcess().Id) continue;
+
+                string? procPath = null;
+                try
+                {
+                    procPath = proc.MainModule?.FileName;
+                }
+                catch { /* Access Denied or process exited */ }
+
+                if (!string.IsNullOrEmpty(procPath) && procPath.StartsWith(fullPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    await log("WARNING", $"⚠️ Process {proc.ProcessName} (PID {proc.Id}) is holding files in target directory. Terminating...", serviceId);
+                    proc.Kill(true);
+                    killedCount++;
+                }
+            }
+            catch { /* Ignore errors for individual processes */ }
+        }
+
+        if (killedCount > 0)
+        {
+            await log("INFO", $"✅ Terminated {killedCount} processes holding files in {directory}", serviceId);
+            await Task.Delay(1000); // Give some time for OS to release locks
+        }
     }
 }

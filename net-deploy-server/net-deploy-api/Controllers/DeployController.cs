@@ -124,11 +124,11 @@ public class DeployController(
                     var repoKey = $"{repoUrl}|{effectiveRepoBranch}";
 
                     var repoUpdated = !request.Pull || await repoUpdateTasks.GetOrAdd(repoKey, _ =>
-                        deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean)
+                        deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, cts.Token)
                     );
 
                     if (!repoUpdated) return false;
-                    return await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, skipBuildIfOutputExists: !request.Build);
+                    return await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, skipBuildIfOutputExists: !request.Build, cts.Token);
                 });
             }
 
@@ -138,7 +138,7 @@ public class DeployController(
                 foreach (var config in request.Services)
                 {
                     if (cts.IsCancellationRequested) break;
-                    pauseEvent.Wait();
+                    pauseEvent.Wait(cts.Token);
 
                     var srv = await servicesLogic.GetByIdAsync(config.ServiceId);
                     if (srv != null) await EnsureServicePrepared(srv, config.Branch);
@@ -147,34 +147,50 @@ public class DeployController(
                 await Log("INFO", "✅ [PHASE 1] All services prepared. Starting next phase...");
             }
 
-            var results = new List<(string Name, bool Success)>();
+            var results = new List<ServiceStatus>();
             foreach (var config in request.Services)
             {
-                if (cts.IsCancellationRequested) break;
-                pauseEvent.Wait();
+                pauseEvent.Wait(cts.Token);
 
                 var service = await servicesLogic.GetByIdAsync(config.ServiceId);
                 if (service is null) { await Log("WARNING", $"⚠️ Service {config.ServiceId} not found."); continue; }
 
+                var status = new ServiceStatus { Name = service.Name };
+                results.Add(status);
+
                 var prepSuccess = await EnsureServicePrepared(service, config.Branch);
-                if (!prepSuccess) { await Log("ERROR", $"❌ Preparation failed for {service.Name}."); results.Add((service.Name, false)); continue; }
+                status.Built = prepSuccess;
 
-                if (!request.Deploy) { await Log("SUCCESS", $"✅ {service.Name} built (Deployment skipped)."); results.Add((service.Name, true)); continue; }
+                if (!prepSuccess) { await Log("ERROR", $"❌ Preparation failed for {service.Name}."); continue; }
 
-                var success = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, skipBuildIfOutputExists: true);
-                if (success) await servicesLogic.MarkDeployedAsync(service.Id!);
-                results.Add((service.Name, success));
+                if (!request.Deploy) { await Log("SUCCESS", $"✅ {service.Name} built (Deployment skipped)."); continue; }
+
+                var deployResult = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, skipBuildIfOutputExists: true, cts.Token);
+                status.Deployed = deployResult.Success;
+                status.Heartbeat = deployResult.Heartbeat;
+
+                if (deployResult.Success) await servicesLogic.MarkDeployedAsync(service.Id!);
             }
 
             if (cts.IsCancellationRequested) await Log("WARNING", "🛑 Deployment stopped by user.");
 
             await Log("INFO", "──────────────────────────────────────────────────");
             await Log("INFO", "📊 DEPLOYMENT SUMMARY:");
-            foreach (var res in results) await Log("INFO", $"  • {res.Name.PadRight(20)} : {(res.Success ? "✅ SUCCESS" : "❌ FAILED")}");
+            await Log("INFO", $"{"Service Name".PadRight(25)} | {"Build".PadRight(8)} | {"Deployed".PadRight(8)} | {"Heartbeat".PadRight(10)}");
+            await Log("INFO", new string('─', 60));
 
-            var successCount = results.Count(r => r.Success);
+            foreach (var s in results)
+            {
+                var builtStr = s.Built == true ? "✅ OK" : (s.Built == false ? "❌ FAIL" : "➖");
+                var deployStr = s.Deployed == true ? "✅ OK" : (s.Deployed == false ? "❌ FAIL" : "➖");
+                var heartStr = s.Heartbeat == true ? "💚 OK" : (s.Heartbeat == false ? "💔 FAIL" : "➖");
+
+                await Log("INFO", $"{s.Name.PadRight(25)} | {builtStr.PadRight(8)} | {deployStr.PadRight(8)} | {heartStr.PadRight(10)}");
+            }
+
+            var successCount = results.Count(r => r.Deployed == true || (r.Deployed == null && r.Built == true));
             var level = successCount == results.Count ? "SUCCESS" : (successCount == 0 ? "ERROR" : "WARNING");
-            await Log(level, $"🏁 Final Result: {successCount}/{results.Count} services deployed.");
+            await Log(level, $"🏁 Final Result: {successCount}/{results.Count} services processed.");
             await Log("INFO", "──────────────────────────────────────────────────");
 
             await deployLogsLogic.AddRangeAsync(logEntries);
@@ -234,4 +250,12 @@ public class DeployController(
     [HttpGet("sessions-paged")]
     public async Task<ActionResult<List<DeployLogsLogic.SessionSummary>>> GetSessionsPaged([FromQuery] int skip = 0, [FromQuery] int limit = 20) =>
         Ok(await deployLogsLogic.GetSessionsPagedAsync(skip, limit));
+
+    public class ServiceStatus
+    {
+        public string Name { get; set; } = "";
+        public bool? Built { get; set; }
+        public bool? Deployed { get; set; }
+        public bool? Heartbeat { get; set; }
+    }
 }

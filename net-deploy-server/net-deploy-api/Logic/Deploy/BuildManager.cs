@@ -2,24 +2,29 @@ namespace NET.Deploy.Api.Logic.Deploy;
 
 public class BuildManager(ProcessRunner processRunner)
 {
-    public async Task<bool> BuildAsync(string projectPath, string outputPath, string serviceType, bool compileSingleFile, LogCallback log, string? serviceId)
+    public async Task<bool> BuildAsync(string projectPath, string outputPath, string serviceType, bool compileSingleFile, LogCallback log, string? serviceId, System.Threading.CancellationToken ct = default)
     {
         var isNode = serviceType is "Angular" or "React" || projectPath.EndsWith("package.json");
 
         return isNode 
-            ? await RunNpmBuildAsync(projectPath, outputPath, log, serviceId, serviceType)
-            : await RunDotnetPublishAsync(projectPath, outputPath, compileSingleFile, log, serviceId);
+            ? await RunNpmBuildAsync(projectPath, outputPath, log, serviceId, serviceType, ct)
+            : await RunDotnetPublishAsync(projectPath, outputPath, compileSingleFile, log, serviceId, ct);
     }
 
-    private async Task<bool> RunNpmBuildAsync(string projectPath, string outputPath, LogCallback log, string? serviceId, string serviceType)
+    private async Task<bool> RunNpmBuildAsync(string projectPath, string outputPath, LogCallback log, string? serviceId, string serviceType, System.Threading.CancellationToken ct)
     {
         var projectDir = Directory.Exists(projectPath) ? projectPath : Path.GetDirectoryName(projectPath)!;
 
         var npm = ExeResolver.Resolve("npm");
         var npx = ExeResolver.Resolve("npx");
 
-        await log("INFO", $"📦 Running npm install in: {projectDir}", serviceId);
-        if (!await processRunner.RunAsync(npm, "install", projectDir, log, serviceId))
+        var lockFile = Path.Combine(projectDir, "package-lock.json");
+        var hasLock = File.Exists(lockFile);
+        var npmAction = hasLock ? "ci" : "install";
+        var npmArgs = $"{npmAction} --no-audit --no-fund --prefer-offline";
+
+        await log("INFO", $"📦 Running npm {npmAction} in: {projectDir}", serviceId);
+        if (!await processRunner.RunAsync(npm, npmArgs, projectDir, log, serviceId, ct))
             return false;
 
         string commandExe;
@@ -40,7 +45,7 @@ public class BuildManager(ProcessRunner processRunner)
         }
 
         await log("INFO", $"🏗️ Running {buildCommand}...", serviceId);
-        if (!await processRunner.RunAsync(commandExe, commandArgs, projectDir, log, serviceId))
+        if (!await processRunner.RunAsync(commandExe, commandArgs, projectDir, log, serviceId, ct))
             return false;
 
         var distPath = Path.Combine(projectDir, "dist");
@@ -63,7 +68,7 @@ public class BuildManager(ProcessRunner processRunner)
         return false;
     }
 
-    private async Task<bool> RunDotnetPublishAsync(string projectPath, string outputPath, bool compileSingleFile, LogCallback log, string? serviceId)
+    private async Task<bool> RunDotnetPublishAsync(string projectPath, string outputPath, bool compileSingleFile, LogCallback log, string? serviceId, System.Threading.CancellationToken ct)
     {
         var projectDir = Directory.Exists(projectPath) ? projectPath : Path.GetDirectoryName(projectPath)!;
         var dotnet = ExeResolver.Resolve("dotnet");
@@ -98,6 +103,6 @@ public class BuildManager(ProcessRunner processRunner)
         }
 
         await log("INFO", $"🏗️ Running dotnet publish in: {projectDir}", serviceId);
-        return await processRunner.RunAsync(dotnet, args, projectDir, log, serviceId);
+        return await processRunner.RunAsync(dotnet, args, projectDir, log, serviceId, ct);
     }
 }

@@ -13,13 +13,13 @@ public class GitLogic(ILogger<GitLogic> logger)
     /// <summary>
     /// Clones the repo if it does not exist locally, otherwise pulls latest changes.
     /// </summary>
-    public async Task<bool> PullAsync(GitSettings git, string repoUrl, string branch, Deploy.LogCallback? log = null, string? sparsePath = null, bool forceClean = false)
+    public async Task<bool> PullAsync(GitSettings git, string repoUrl, string branch, Deploy.LogCallback? log = null, string? sparsePath = null, bool forceClean = false, System.Threading.CancellationToken ct = default)
     {
         var repoDirName = GetSafeRepoName(repoUrl);
         var repoPath = Path.Combine(git.LocalBaseDir, repoDirName);
 
         var @lock = GetRepoLock(repoPath);
-        await @lock.WaitAsync();
+        await @lock.WaitAsync(ct);
 
         try
         {
@@ -66,7 +66,7 @@ public class GitLogic(ILogger<GitLogic> logger)
 
                 var cloneArgs = $"clone -b {branch} {authUrl} .";
 
-                if (!await RunGitAsync(repoPath, cloneArgs, "Cloning", log))
+                if (!await RunGitAsync(repoPath, cloneArgs, "Cloning", log, ct))
                     return false;
 
                 return true;
@@ -80,14 +80,14 @@ public class GitLogic(ILogger<GitLogic> logger)
             var lockFile = Path.Combine(repoPath, ".git", "index.lock");
             if (File.Exists(lockFile)) File.Delete(lockFile);
 
-            if (!await RunGitAsync(repoPath, "fetch --all", "Fetch", log))
+            if (!await RunGitAsync(repoPath, "fetch --all", "Fetch", log, ct))
                 return false;
 
             // If branch looks like a commit hash (7-40 chars hex), reset directly to it. Otherwise use origin prefix.
             bool isHash = branch.Length >= 7 && branch.All(c => "0123456789abcdefABCDEF".Contains(c));
             string resetCmd = isHash ? $"reset --hard {branch}" : $"reset --hard origin/{branch}";
 
-            return await RunGitAsync(repoPath, resetCmd, "Reset", log);
+            return await RunGitAsync(repoPath, resetCmd, "Reset", log, ct);
         }
         finally
         {
@@ -99,12 +99,40 @@ public class GitLogic(ILogger<GitLogic> logger)
     {
         if (!Directory.Exists(path)) return;
 
-        foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+        try
         {
-            File.SetAttributes(file, FileAttributes.Normal);
-        }
+            // 1. Instant Rename: Move to a temp folder so the main path is immediately available for a fresh clone
+            var tempPath = path + "_del_" + Guid.NewGuid().ToString("N");
+            Directory.Move(path, tempPath);
 
-        Directory.Delete(path, true);
+            // 2. Background Deletion: Perform the slow file-by-file attribute clearing and deletion on a separate thread
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    if (!Directory.Exists(tempPath)) return;
+                    foreach (var file in Directory.GetFiles(tempPath, "*", SearchOption.AllDirectories))
+                    {
+                        try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
+                    }
+                    Directory.Delete(tempPath, true);
+                }
+                catch { /* Background cleanup errors are suppressed to not crash the app */ }
+            });
+        }
+        catch
+        {
+            // Fallback: If rename fails (e.g. file locked), try direct deletion
+            try
+            {
+                foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+                {
+                    try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
+                }
+                Directory.Delete(path, true);
+            }
+            catch { }
+        }
     }
 
     public string GetRepoLocalPath(GitSettings git, string repoUrl, string? sparsePath = null)
@@ -133,13 +161,6 @@ public class GitLogic(ILogger<GitLogic> logger)
 
             var repoUrl = repoPart.EndsWith(".git") ? repoPart : repoPart + ".git";
             return (repoUrl, branch, path);
-        }
-
-        // Just a directory link?
-        if (fullUrl.Contains("github.com") && !fullUrl.EndsWith(".git") && fullUrl.Count(c => c == '/') > 4)
-        {
-            // Possibly https://github.com/user/repo/src/Folder
-            // Not a standard format we handle well yet, but let's try
         }
 
         return (fullUrl.EndsWith(".git") ? fullUrl : fullUrl + ".git", "main", "");
@@ -238,22 +259,18 @@ public class GitLogic(ILogger<GitLogic> logger)
         return output.Trim();
     }
 
-    // ─────────────────────────────── helpers ───────────────────────────────
-
     public async Task<List<string>> GetRepositoriesAsync(GitSettings git)
     {
         if (string.IsNullOrWhiteSpace(git.Token)) return new List<string>();
 
         using var client = new HttpClient();
         client.DefaultRequestHeaders.Add("User-Agent", "NET-Deploy-App");
-        // GitHub recommends "token" or "Bearer". Let's try "token" which is classic for PATs.
         client.DefaultRequestHeaders.TryAddWithoutValidation("Authorization", $"token {git.Token}");
 
         try
         {
             var url = "https://api.github.com/user/repos?per_page=100&sort=updated";
             var response = await client.GetAsync(url);
-
             var content = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
@@ -263,19 +280,12 @@ public class GitLogic(ILogger<GitLogic> logger)
             }
 
             using var doc = System.Text.Json.JsonDocument.Parse(content);
-            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array)
-            {
-                logger.LogWarning("GitHub API returned non-array: {Content}", content);
-                return new List<string>();
-            }
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Array) return new List<string>();
 
-            var repos = doc.RootElement.EnumerateArray()
+            return doc.RootElement.EnumerateArray()
                 .Select(r => r.GetProperty("clone_url").GetString() ?? "")
                 .Where(u => !string.IsNullOrEmpty(u))
                 .ToList();
-
-            logger.LogInformation("Fetched {Count} repos from GitHub.", repos.Count);
-            return repos;
         }
         catch (Exception ex)
         {
@@ -287,19 +297,14 @@ public class GitLogic(ILogger<GitLogic> logger)
     private static string BuildAuthUrl(GitSettings git, string repoUrl)
     {
         if (string.IsNullOrWhiteSpace(git.Token)) return repoUrl;
-
         var uri = new Uri(repoUrl);
-        // Using x-access-token for GitHub App/Fine-grained PAT tokens
         return $"{uri.Scheme}://x-access-token:{git.Token}@{uri.Host}{uri.PathAndQuery}";
     }
 
-
-    private async Task<bool> RunGitAsync(string workingDir, string arguments, string operation, Deploy.LogCallback? log = null)
+    private async Task<bool> RunGitAsync(string workingDir, string arguments, string operation, Deploy.LogCallback? log = null, System.Threading.CancellationToken ct = default)
     {
         Directory.CreateDirectory(workingDir);
-
         var gitExe = Deploy.ExeResolver.Resolve("git");
-        // -c credential.helper= forces git to ignore any locally saved credentials on the machine
         var fullArgs = $"-c credential.helper= {arguments}";
         var psi = new ProcessStartInfo(gitExe, fullArgs)
         {
@@ -309,8 +314,6 @@ public class GitLogic(ILogger<GitLogic> logger)
             UseShellExecute = false,
             CreateNoWindow = true
         };
-
-        // Prevent git from hanging on auth prompts
         psi.EnvironmentVariables["GIT_TERMINAL_PROMPT"] = "0";
 
         using var process = Process.Start(psi)
@@ -318,7 +321,16 @@ public class GitLogic(ILogger<GitLogic> logger)
 
         var outputTask = process.StandardOutput.ReadToEndAsync();
         var errorTask = process.StandardError.ReadToEndAsync();
-        await process.WaitForExitAsync();
+        
+        try
+        {
+            await process.WaitForExitAsync(ct);
+        }
+        catch (OperationCanceledException)
+        {
+            try { process.Kill(true); } catch { }
+            throw;
+        }
 
         var output = await outputTask;
         var error = await errorTask;
@@ -330,7 +342,6 @@ public class GitLogic(ILogger<GitLogic> logger)
             return false;
         }
 
-        logger.LogDebug("Git {Op} output: {Output}", operation, output);
         if (log != null && !string.IsNullOrWhiteSpace(output)) await log("INFO", output.Trim());
         return true;
     }
