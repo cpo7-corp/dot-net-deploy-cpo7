@@ -169,25 +169,25 @@ public class DeployController(
 
                 if (!prepSuccess) 
                 { 
-                    status.Duration = DateTime.UtcNow - startTime;
+                    status.Duration = TimeSpan.FromSeconds(buildSeconds) + (DateTime.UtcNow - startTime);
                     await Log("ERROR", $"❌ Preparation failed for {service.Name}."); 
                     continue; 
                 }
 
                 if (!request.Deploy) 
                 { 
-                    status.Duration = DateTime.UtcNow - startTime;
+                    status.Duration = TimeSpan.FromSeconds(buildSeconds) + (DateTime.UtcNow - startTime);
                     await Log("SUCCESS", $"✅ {service.Name} built (Deployment skipped)."); 
                     continue; 
                 }
 
-                stepStart = DateTime.UtcNow;
+                var stepStart = DateTime.UtcNow;
                 var deployResult = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, skipBuildIfOutputExists: true, cts.Token);
                 status.DeploySeconds = deployResult.TransferSeconds;
                 status.HeartbeatSeconds = deployResult.HeartbeatSeconds;
                 status.Deployed = deployResult.Success;
                 status.Heartbeat = deployResult.Heartbeat;
-                status.Duration = DateTime.UtcNow - startTime;
+                status.Duration = TimeSpan.FromSeconds(buildSeconds) + (DateTime.UtcNow - startTime);
 
                 if (deployResult.Success) await servicesLogic.MarkDeployedAsync(service.Id!);
             }
