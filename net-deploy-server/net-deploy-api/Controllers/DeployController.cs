@@ -157,17 +157,29 @@ public class DeployController(
 
                 var status = new ServiceStatus { Name = service.Name };
                 results.Add(status);
+                var startTime = DateTime.UtcNow;
 
                 var prepSuccess = await EnsureServicePrepared(service, config.Branch);
                 status.Built = prepSuccess;
 
-                if (!prepSuccess) { await Log("ERROR", $"❌ Preparation failed for {service.Name}."); continue; }
+                if (!prepSuccess) 
+                { 
+                    status.Duration = DateTime.UtcNow - startTime;
+                    await Log("ERROR", $"❌ Preparation failed for {service.Name}."); 
+                    continue; 
+                }
 
-                if (!request.Deploy) { await Log("SUCCESS", $"✅ {service.Name} built (Deployment skipped)."); continue; }
+                if (!request.Deploy) 
+                { 
+                    status.Duration = DateTime.UtcNow - startTime;
+                    await Log("SUCCESS", $"✅ {service.Name} built (Deployment skipped)."); 
+                    continue; 
+                }
 
                 var deployResult = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, skipBuildIfOutputExists: true, cts.Token);
                 status.Deployed = deployResult.Success;
                 status.Heartbeat = deployResult.Heartbeat;
+                status.Duration = DateTime.UtcNow - startTime;
 
                 if (deployResult.Success) await servicesLogic.MarkDeployedAsync(service.Id!);
             }
@@ -176,16 +188,17 @@ public class DeployController(
 
             await Log("INFO", "──────────────────────────────────────────────────");
             await Log("INFO", "📊 DEPLOYMENT SUMMARY:");
-            await Log("INFO", $"{"Service Name".PadRight(25)} | {"Build".PadRight(8)} | {"Deployed".PadRight(8)} | {"Heartbeat".PadRight(10)}");
-            await Log("INFO", new string('─', 60));
+            await Log("INFO", $"{"Service Name".PadRight(25)} | {"Build".PadRight(8)} | {"Deployed".PadRight(8)} | {"Heartbeat".PadRight(10)} | {"Time".PadRight(8)}");
+            await Log("INFO", new string('─', 70));
 
             foreach (var s in results)
             {
                 var builtStr = s.Built == true ? "✅ OK" : (s.Built == false ? "❌ FAIL" : "➖");
                 var deployStr = s.Deployed == true ? "✅ OK" : (s.Deployed == false ? "❌ FAIL" : "➖");
                 var heartStr = s.Heartbeat == true ? "💚 OK" : (s.Heartbeat == false ? "💔 FAIL" : "➖");
+                var timeStr = $"{(int)s.Duration.TotalMinutes}m {s.Duration.Seconds}s";
 
-                await Log("INFO", $"{s.Name.PadRight(25)} | {builtStr.PadRight(8)} | {deployStr.PadRight(8)} | {heartStr.PadRight(10)}");
+                await Log("INFO", $"{s.Name.PadRight(25)} | {builtStr.PadRight(8)} | {deployStr.PadRight(8)} | {heartStr.PadRight(10)} | {timeStr.PadRight(8)}");
             }
 
             var successCount = results.Count(r => r.Deployed == true || (r.Deployed == null && r.Built == true));
@@ -257,5 +270,6 @@ public class DeployController(
         public bool? Built { get; set; }
         public bool? Deployed { get; set; }
         public bool? Heartbeat { get; set; }
+        public TimeSpan Duration { get; set; }
     }
 }
