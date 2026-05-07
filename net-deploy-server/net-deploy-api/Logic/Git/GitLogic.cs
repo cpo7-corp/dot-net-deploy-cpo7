@@ -26,6 +26,9 @@ public class GitLogic(ILogger<GitLogic> logger)
             // Ensure base directory exists
             Directory.CreateDirectory(git.LocalBaseDir);
 
+            // Cleanup any stale temporary folders from previous failed deletions
+            CleanupStaleDeletedDirectories(git.LocalBaseDir);
+
             var authUrl = BuildAuthUrl(git, repoUrl);
 
             // 1. Force Clean Logic
@@ -95,6 +98,24 @@ public class GitLogic(ILogger<GitLogic> logger)
         }
     }
 
+    private void CleanupStaleDeletedDirectories(string baseDir)
+    {
+        try
+        {
+            if (!Directory.Exists(baseDir)) return;
+            var dirs = Directory.GetDirectories(baseDir, "*_del_*");
+            foreach (var dir in dirs)
+            {
+                // Only try to delete if it's older than 10 minutes (to avoid deleting folders currently being processed)
+                if (Directory.GetCreationTime(dir) < DateTime.Now.AddMinutes(-10))
+                {
+                    _ = Task.Run(() => DeleteDirectoryRecursivelyInternal(dir));
+                }
+            }
+        }
+        catch { }
+    }
+
     private void DeleteDirectoryRecursively(string path)
     {
         if (!Directory.Exists(path)) return;
@@ -106,33 +127,27 @@ public class GitLogic(ILogger<GitLogic> logger)
             Directory.Move(path, tempPath);
 
             // 2. Background Deletion: Perform the slow file-by-file attribute clearing and deletion on a separate thread
-            _ = Task.Run(() =>
-            {
-                try
-                {
-                    if (!Directory.Exists(tempPath)) return;
-                    foreach (var file in Directory.GetFiles(tempPath, "*", SearchOption.AllDirectories))
-                    {
-                        try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
-                    }
-                    Directory.Delete(tempPath, true);
-                }
-                catch { /* Background cleanup errors are suppressed to not crash the app */ }
-            });
+            _ = Task.Run(() => DeleteDirectoryRecursivelyInternal(tempPath));
         }
         catch
         {
             // Fallback: If rename fails (e.g. file locked), try direct deletion
-            try
-            {
-                foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
-                {
-                    try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
-                }
-                Directory.Delete(path, true);
-            }
-            catch { }
+            DeleteDirectoryRecursivelyInternal(path);
         }
+    }
+
+    private void DeleteDirectoryRecursivelyInternal(string path)
+    {
+        try
+        {
+            if (!Directory.Exists(path)) return;
+            foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+            {
+                try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
+            }
+            Directory.Delete(path, true);
+        }
+        catch { /* Background cleanup errors are suppressed */ }
     }
 
     public string GetRepoLocalPath(GitSettings git, string repoUrl, string? sparsePath = null)
