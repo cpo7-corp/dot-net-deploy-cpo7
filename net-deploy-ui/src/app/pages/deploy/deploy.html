@@ -156,12 +156,21 @@
               </label>
             </div>
 
-            <div class="form-check">
+            <div class="form-check mb-2">
               <input class="form-check-input" type="checkbox" id="checkDeploy" [ngModel]="deploySvc.deployTransfer()"
                 (ngModelChange)="deploySvc.deployTransfer.set($event)" [disabled]="deploying()">
               <label class="form-check-label small" for="checkDeploy" style="cursor: pointer;"
                 [class.text-white]="deploySvc.deployTransfer()" [class.text-secondary]="!deploySvc.deployTransfer()">
                 <i class="bi bi-rocket-takeoff me-1"></i> {{ 'strategyTransfer' | translate }}
+              </label>
+            </div>
+
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="checkWaitAllBuilds" [ngModel]="deploySvc.deployWaitAllBuilds()"
+                (ngModelChange)="deploySvc.deployWaitAllBuilds.set($event)" [disabled]="deploying()">
+              <label class="form-check-label small" for="checkWaitAllBuilds" style="cursor: pointer;"
+                [class.text-white]="deploySvc.deployWaitAllBuilds()" [class.text-secondary]="!deploySvc.deployWaitAllBuilds()">
+                <i class="bi bi-hourglass-split me-1"></i> {{ 'strategyWaitAllBuilds' | translate }}
               </label>
             </div>
           </div>

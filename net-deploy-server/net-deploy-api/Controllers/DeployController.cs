@@ -18,7 +18,8 @@ public record DeployRequest(
     bool ForceClean = false,
     bool Pull = true,
     bool Build = true,
-    bool Deploy = true);
+    bool Deploy = true,
+    bool WaitAllBuildsToDeploy = true);
 
 
 [ApiController]
@@ -87,12 +88,31 @@ public class DeployController(
 
         var logEntries = new List<DeployLogEntryDB>();
         var responseLock = new SemaphoreSlim(1, 1);
+        var serviceNamesMap = new ConcurrentDictionary<string, string>();
+
+        foreach (var config in request.Services)
+        {
+            var srv = await servicesLogic.GetByIdAsync(config.ServiceId);
+            if (srv?.Id != null && !string.IsNullOrEmpty(srv.Name))
+            {
+                serviceNamesMap[srv.Id] = srv.Name;
+            }
+        }
 
         async Task Log(string level, string message, string? serviceId = null)
         {
-            var entry = new DeployLogEntryDB { SessionId = sessionId, Level = level, Message = message, ServiceId = serviceId, Created = DateTime.UtcNow };
+            var formattedMessage = message;
+            if (!string.IsNullOrEmpty(serviceId) && serviceNamesMap.TryGetValue(serviceId, out var srvName))
+            {
+                if (!formattedMessage.StartsWith($"[{srvName}]"))
+                {
+                    formattedMessage = $"[{srvName}] {formattedMessage}";
+                }
+            }
+
+            var entry = new DeployLogEntryDB { SessionId = sessionId, Level = level, Message = formattedMessage, ServiceId = serviceId, Created = DateTime.UtcNow };
             lock (logEntries) { logEntries.Add(entry); }
-            var line = $"data: {{\"level\":\"{level}\",\"message\":{System.Text.Json.JsonSerializer.Serialize(message)},\"serviceId\":\"{serviceId}\"}}\n\n";
+            var line = $"data: {{\"level\":\"{level}\",\"message\":{System.Text.Json.JsonSerializer.Serialize(formattedMessage)},\"serviceId\":\"{serviceId}\"}}\n\n";
             await responseLock.WaitAsync();
             try { await Response.WriteAsync(line); await Response.Body.FlushAsync(); }
             finally { responseLock.Release(); }
@@ -135,31 +155,16 @@ public class DeployController(
             }
 
             var sessionStartTime = DateTime.UtcNow;
+            var results = new ConcurrentBag<ServiceStatus>();
+            var deployedForHeartbeat = new ConcurrentBag<(ServiceStatus Status, ServiceDefinitionDB Service, ServiceEnvironmentConfig EnvCfg)>();
 
-            if (request.Pull)
+            async Task ProcessServiceDeployment(ServiceDeploymentConfig config)
             {
-                await Log("INFO", "🔍 [PHASE 1] Preparing all services (Pull, Build, Config)...");
-                foreach (var config in request.Services)
-                {
-                    if (cts.IsCancellationRequested) break;
-                    pauseEvent.Wait(cts.Token);
-
-                    var srv = await servicesLogic.GetByIdAsync(config.ServiceId);
-                    if (srv != null) await EnsureServicePrepared(srv, config.Branch);
-                }
-                if (cts.IsCancellationRequested) { await Log("WARNING", "🛑 [PHASE 1] Deployment cancelled."); return; }
-                await Log("INFO", "✅ [PHASE 1] All services prepared. Starting next phase...");
-            }
-
-            var results = new List<ServiceStatus>();
-            var deployedForHeartbeat = new List<(ServiceStatus Status, ServiceDefinitionDB Service, ServiceEnvironmentConfig EnvCfg)>();
-
-            foreach (var config in request.Services)
-            {
+                if (cts.IsCancellationRequested) return;
                 pauseEvent.Wait(cts.Token);
 
                 var service = await servicesLogic.GetByIdAsync(config.ServiceId);
-                if (service is null) { await Log("WARNING", $"⚠️ Service {config.ServiceId} not found."); continue; }
+                if (service is null) { await Log("WARNING", $"⚠️ Service {config.ServiceId} not found."); return; }
 
                 var status = new ServiceStatus { Name = service.Name };
                 results.Add(status);
@@ -173,14 +178,14 @@ public class DeployController(
                 { 
                     status.Duration = TimeSpan.FromSeconds(buildSeconds) + (DateTime.UtcNow - startTime);
                     await Log("ERROR", $"❌ Preparation failed for {service.Name}.", service.Id); 
-                    continue; 
+                    return; 
                 }
 
                 if (!request.Deploy) 
                 { 
                     status.Duration = TimeSpan.FromSeconds(buildSeconds) + (DateTime.UtcNow - startTime);
                     await Log("SUCCESS", $"✅ {service.Name} built (Deployment skipped).", service.Id); 
-                    continue; 
+                    return; 
                 }
 
                 var stepStart = DateTime.UtcNow;
@@ -198,6 +203,32 @@ public class DeployController(
                         deployedForHeartbeat.Add((status, service, envCfg));
                     }
                 }
+            }
+
+            if (request.WaitAllBuildsToDeploy)
+            {
+                if (request.Pull || request.Build)
+                {
+                    await Log("INFO", "🔍 [PHASE 1] Building all services in parallel (waiting for all builds before deploy)...");
+                    var prepTasks = request.Services.Select(async config =>
+                    {
+                        if (cts.IsCancellationRequested) return;
+                        pauseEvent.Wait(cts.Token);
+                        var srv = await servicesLogic.GetByIdAsync(config.ServiceId);
+                        if (srv != null) await EnsureServicePrepared(srv, config.Branch);
+                    });
+                    await Task.WhenAll(prepTasks);
+                    if (cts.IsCancellationRequested) { await Log("WARNING", "🛑 Deployment cancelled after preparation phase."); return; }
+                    await Log("INFO", "✅ [PHASE 1] All service builds completed. Starting deployment phase...");
+                }
+
+                await Log("INFO", "🚀 [PHASE 2] Deploying all services in parallel...");
+                await Task.WhenAll(request.Services.Select(config => ProcessServiceDeployment(config)));
+            }
+            else
+            {
+                await Log("INFO", "⚡ [STREAMING] Running independent end-to-end pipeline for each service concurrently...");
+                await Task.WhenAll(request.Services.Select(config => ProcessServiceDeployment(config)));
             }
 
             if (request.Deploy && deployedForHeartbeat.Count > 0 && !cts.IsCancellationRequested)
