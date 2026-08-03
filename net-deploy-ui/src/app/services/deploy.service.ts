@@ -1,4 +1,4 @@
-import { Injectable, NgZone, signal, WritableSignal } from '@angular/core';
+import { Injectable, NgZone, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import { DeployLogEntry, PagedResult, ProjectVersion } from '../models/api-models';
 import { Observable, Subject } from 'rxjs';
@@ -95,48 +95,73 @@ export class DeployService extends ApiService {
     if (!progress[serviceId]) return;
     const row = { ...progress[serviceId] };
 
-    if (message.includes('🔨 [Prep] Building')) {
+    // BUILD PHASE
+    if (message.includes('🔨 [Prep] Building') || message.includes('📥 [Prep] Pulling')) {
       row.compiled = 'process';
-      row.buildStartTime = Date.now();
+      if (!row.buildStartTime) row.buildStartTime = Date.now();
     }
-    if (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists') || message.includes('❌ Preparation failed')) {
-      row.compiled = (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists')) ? 'success' : 'error';
-      if (row.buildStartTime) {
+    if (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists') || (message.includes('✅') && message.includes('built'))) {
+      row.compiled = 'success';
+      if (row.buildStartTime && !row.buildTime) {
         row.buildTime = ((Date.now() - row.buildStartTime) / 1000).toFixed(1) + 's';
       }
     }
-    if (message.includes('🚀 Uploading files') || message.includes('📂 Copying files')) {
-      row.deployed = 'process';
-      row.deployStartTime = Date.now();
+    if (message.includes('❌ Preparation failed') || message.includes('❌ Build failed')) {
+      row.compiled = 'error';
+      if (row.buildStartTime && !row.buildTime) {
+        row.buildTime = ((Date.now() - row.buildStartTime) / 1000).toFixed(1) + 's';
+      }
     }
-    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied')) {
+
+    // DEPLOY PHASE
+    if (message.includes('🚀 Uploading files') || message.includes('📂 Copying files')) {
+      if (row.compiled === 'process' || row.compiled === 'pending') {
+        row.compiled = 'success';
+        if (row.buildStartTime && !row.buildTime) {
+          row.buildTime = ((Date.now() - row.buildStartTime) / 1000).toFixed(1) + 's';
+        }
+      }
+      row.deployed = 'process';
+      if (!row.deployStartTime) row.deployStartTime = Date.now();
+    }
+    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied') || message.includes('🚀 Deploy complete')) {
+      if (row.compiled === 'process' || row.compiled === 'pending') {
+        row.compiled = 'success';
+      }
       row.deployed = 'success';
-      if (row.deployStartTime) {
+      if (row.deployStartTime && !row.deployTime) {
         row.deployTime = ((Date.now() - row.deployStartTime) / 1000).toFixed(1) + 's';
       }
     }
-    if (message.includes('❌ Failed to transfer')) row.deployed = 'error';
+    if (message.includes('❌ Failed to transfer') || message.includes('❌ Deploy failed')) {
+      row.deployed = 'error';
+      if (row.deployStartTime && !row.deployTime) {
+        row.deployTime = ((Date.now() - row.deployStartTime) / 1000).toFixed(1) + 's';
+      }
+    }
+
+    // HEARTBEAT PHASE
     if (message.includes('💓 Checking heartbeat')) {
       row.heartbeat = 'process';
-      row.heartbeatStartTime = Date.now();
+      if (!row.heartbeatStartTime) row.heartbeatStartTime = Date.now();
     }
     if (message.includes('✅ Heartbeat OK')) {
       row.heartbeat = 'success';
-      if (row.heartbeatStartTime) {
+      if (row.heartbeatStartTime && !row.heartbeatTime) {
         row.heartbeatTime = ((Date.now() - row.heartbeatStartTime) / 1000).toFixed(1) + 's';
       }
     }
     if (message.includes('⚠️ Heartbeat returned error') || message.includes('❌ Heartbeat failed')) {
       row.heartbeat = 'error';
-      if (row.heartbeatStartTime) {
+      if (row.heartbeatStartTime && !row.heartbeatTime) {
         row.heartbeatTime = ((Date.now() - row.heartbeatStartTime) / 1000).toFixed(1) + 's';
       }
     }
 
     if (level === 'ERROR') {
-      if (row.compiled === 'process' || row.compiled === 'pending') row.compiled = 'error';
-      if (row.deployed === 'process' || row.deployed === 'pending') row.deployed = 'error';
-      if (row.heartbeat === 'process' || row.heartbeat === 'pending') row.heartbeat = 'error';
+      if (row.compiled === 'process') row.compiled = 'error';
+      if (row.deployed === 'process') row.deployed = 'error';
+      if (row.heartbeat === 'process') row.heartbeat = 'error';
     }
 
     progress[serviceId] = row;
@@ -162,12 +187,6 @@ export class DeployService extends ApiService {
     }
   }
 
-  // Original API methods remain below...
-
-  /**
-   * Triggers a deploy and returns an Observable that streams log entries
-   * via Server-Sent Events (SSE).
-   */
   deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null, forceClean: boolean = false, pull: boolean = true, build: boolean = true, deploy: boolean = true): Observable<DeployLogEntry> {
     return this.streamLogs(`${this.baseUrl}/deploy`, { services, environmentId, forceClean, pull, build, deploy });
   }
@@ -229,7 +248,6 @@ export class DeployService extends ApiService {
 
     return subject.asObservable();
   }
-
 
   getSessions(count = 10): Observable<string[]> {
     return this.http!.get<string[]>(`${this.baseUrl}/Deploy/sessions?count=${count}`);

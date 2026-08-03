@@ -37,14 +37,20 @@
     } @else {
       <div class="group-stack">
         @for (group of groupedServices(); track group.key) {
-          <div class="card bg-dark text-white border-secondary glass-panel shadow-sm group-card">
-            <div class="card-header border-secondary py-3 d-flex justify-content-between align-items-center">
+          <div class="card bg-dark text-white border-secondary glass-panel shadow-sm group-card mb-3">
+            <div class="card-header border-secondary py-3 d-flex justify-content-between align-items-center group-header"
+                 style="cursor: pointer; user-select: none;"
+                 (click)="toggleGroupCollapse(group.key)">
               <div class="d-flex align-items-center gap-2">
                 <i class="bi bi-collection text-primary"></i>
                 <h5 class="mb-0">{{ group.title }}</h5>
+                <span class="badge text-bg-secondary ms-1">{{ group.services.length }}</span>
               </div>
-              <span class="badge text-bg-secondary">{{ group.services.length }}</span>
+              <i class="bi text-secondary ms-2"
+                 [class.bi-chevron-down]="!isGroupCollapsed(group.key)"
+                 [class.bi-chevron-right]="isGroupCollapsed(group.key)"></i>
             </div>
+            @if (!isGroupCollapsed(group.key)) {
             <div class="table-responsive">
               <table class="table table-dark table-hover mb-0 align-middle clickable-table">
                 <thead>
@@ -136,6 +142,7 @@
                 </tbody>
               </table>
             </div>
+            }
           </div>
         }
       </div>

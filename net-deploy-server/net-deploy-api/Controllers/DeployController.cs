@@ -172,14 +172,14 @@ public class DeployController(
                 if (!prepSuccess) 
                 { 
                     status.Duration = TimeSpan.FromSeconds(buildSeconds) + (DateTime.UtcNow - startTime);
-                    await Log("ERROR", $"❌ Preparation failed for {service.Name}."); 
+                    await Log("ERROR", $"❌ Preparation failed for {service.Name}.", service.Id); 
                     continue; 
                 }
 
                 if (!request.Deploy) 
                 { 
                     status.Duration = TimeSpan.FromSeconds(buildSeconds) + (DateTime.UtcNow - startTime);
-                    await Log("SUCCESS", $"✅ {service.Name} built (Deployment skipped)."); 
+                    await Log("SUCCESS", $"✅ {service.Name} built (Deployment skipped).", service.Id); 
                     continue; 
                 }
 

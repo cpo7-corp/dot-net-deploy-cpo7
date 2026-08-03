@@ -66,10 +66,43 @@ export class ServicesComponent implements OnInit {
       }));
   });
 
+  collapsedGroups = signal<Set<string>>(new Set());
+
   ngOnInit() {
+    try {
+      const savedCollapsed = localStorage.getItem('servicesPageCollapsedGroups');
+      if (savedCollapsed) {
+        const parsed = JSON.parse(savedCollapsed);
+        if (Array.isArray(parsed)) {
+          this.collapsedGroups.set(new Set(parsed));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load collapsed groups from localStorage', e);
+    }
+
     this.loadData();
     this.loadConfigSets();
     this.loadEnvironments();
+  }
+
+  toggleGroupCollapse(groupKey: string) {
+    const current = new Set(this.collapsedGroups());
+    if (current.has(groupKey)) {
+      current.delete(groupKey);
+    } else {
+      current.add(groupKey);
+    }
+    this.collapsedGroups.set(current);
+    try {
+      localStorage.setItem('servicesPageCollapsedGroups', JSON.stringify(Array.from(current)));
+    } catch (e) {
+      console.error('Failed to save collapsed groups to localStorage', e);
+    }
+  }
+
+  isGroupCollapsed(groupKey: string): boolean {
+    return this.collapsedGroups().has(groupKey);
   }
 
   loadData() {
