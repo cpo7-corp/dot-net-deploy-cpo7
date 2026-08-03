@@ -302,6 +302,8 @@ public class DeployLogic(
             });
         }
 
+        await log("SUCCESS", $"🎉 {service.Name} finished deployment successfully!", service.Id);
+
         bool? heartbeatSuccess = null;
         var heartbeatStart = DateTime.UtcNow;
         if (!skipHeartbeat && !string.IsNullOrWhiteSpace(envConfig.HeartbeatUrl))

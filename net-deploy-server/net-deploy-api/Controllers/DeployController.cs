@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Deploy;
 using NET.Deploy.Api.Logic.DeployLogs;
+using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.Services;
 using NET.Deploy.Api.Logic.Settings;
 using System.Collections.Concurrent;
@@ -26,6 +27,7 @@ public record DeployRequest(
 [Route("api/[controller]")]
 public class DeployController(
     DeployLogic deployLogic,
+    GitLogic gitLogic,
     ServicesLogic servicesLogic,
     SettingsLogic settingsLogic,
     DeployLogsLogic deployLogsLogic) : ControllerBase
@@ -142,7 +144,8 @@ public class DeployController(
                     var prepStart = DateTime.UtcNow;
                     var (repoUrl, gitBranch, _) = deployLogic.ParseGitUrl(srv.RepoUrl);
                     var effectiveRepoBranch = branchOverride ?? (string.IsNullOrWhiteSpace(envCfg?.DefaultBranch) ? gitBranch : envCfg.DefaultBranch);
-                    var repoKey = $"{repoUrl}|{effectiveRepoBranch}";
+                    var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl);
+                    var repoKey = $"{repoLocalPath.ToLowerInvariant()}|{effectiveRepoBranch}";
 
                     var repoUpdated = !request.Pull || await repoUpdateTasks.GetOrAdd(repoKey, _ =>
                         deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, cts.Token)

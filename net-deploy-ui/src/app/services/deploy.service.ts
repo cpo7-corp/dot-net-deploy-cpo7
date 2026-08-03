@@ -126,7 +126,7 @@ export class DeployService extends ApiService {
       row.deployed = 'process';
       if (!row.deployStartTime) row.deployStartTime = Date.now();
     }
-    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied') || message.includes('🚀 Deploy complete')) {
+    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied') || message.includes('🚀 Deploy complete') || message.includes('finished deployment successfully') || message.includes('Recording version')) {
       if (row.compiled === 'process' || row.compiled === 'pending') {
         row.compiled = 'success';
       }
