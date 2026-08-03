@@ -152,6 +152,8 @@ public class DeployController(
             }
 
             var results = new List<ServiceStatus>();
+            var deployedForHeartbeat = new List<(ServiceStatus Status, ServiceDefinitionDB Service, ServiceEnvironmentConfig EnvCfg)>();
+
             foreach (var config in request.Services)
             {
                 pauseEvent.Wait(cts.Token);
@@ -182,14 +184,34 @@ public class DeployController(
                 }
 
                 var stepStart = DateTime.UtcNow;
-                var deployResult = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, skipBuildIfOutputExists: true, cts.Token);
+                var deployResult = await deployLogic.DeployServiceAsync(service, settings, Log, vpsSettings.Id, config.Branch, vpsSettings, request.ForceClean, skipPull: true, skipBuildIfOutputExists: true, skipHeartbeat: true, ct: cts.Token);
                 status.DeploySeconds = deployResult.TransferSeconds;
-                status.HeartbeatSeconds = deployResult.HeartbeatSeconds;
                 status.Deployed = deployResult.Success;
-                status.Heartbeat = deployResult.Heartbeat;
                 status.Duration = TimeSpan.FromSeconds(buildSeconds) + (DateTime.UtcNow - startTime);
 
-                if (deployResult.Success) await servicesLogic.MarkDeployedAsync(service.Id!);
+                if (deployResult.Success)
+                {
+                    await servicesLogic.MarkDeployedAsync(service.Id!);
+                    var envCfg = service.Environments.FirstOrDefault(e => e.EnvironmentId == vpsSettings.Id);
+                    if (envCfg != null && !string.IsNullOrWhiteSpace(envCfg.HeartbeatUrl))
+                    {
+                        deployedForHeartbeat.Add((status, service, envCfg));
+                    }
+                }
+            }
+
+            if (request.Deploy && deployedForHeartbeat.Count > 0 && !cts.IsCancellationRequested)
+            {
+                await Log("INFO", "💓 [PHASE 3] Checking heartbeats for all deployed services concurrently...");
+                var heartbeatTasks = deployedForHeartbeat.Select(async item =>
+                {
+                    var hbStart = DateTime.UtcNow;
+                    var hbSuccess = await deployLogic.CheckHeartbeatAsync(item.EnvCfg.HeartbeatUrl, Log, item.Service.Id);
+                    item.Status.Heartbeat = hbSuccess;
+                    item.Status.HeartbeatSeconds = (DateTime.UtcNow - hbStart).TotalSeconds;
+                    item.Status.Duration += TimeSpan.FromSeconds(item.Status.HeartbeatSeconds);
+                });
+                await Task.WhenAll(heartbeatTasks);
             }
 
             if (cts.IsCancellationRequested) await Log("WARNING", "🛑 Deployment stopped by user.");

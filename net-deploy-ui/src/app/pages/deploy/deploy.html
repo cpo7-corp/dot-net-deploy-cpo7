@@ -44,10 +44,26 @@
 
           <div class="list-group list-group-flush border-0">
             @for (group of groupedServices(); track group.key) {
-            <div class="px-3 py-2 small fw-semibold text-info bg-black bg-opacity-25 border-bottom border-secondary">
-              {{ group.title }}
+            <div class="px-3 py-2 bg-black bg-opacity-25 border-bottom border-secondary d-flex align-items-center justify-content-between group-header"
+              style="cursor: pointer; user-select: none;"
+              (click)="toggleGroupCollapse(group.key)">
+              <div class="d-flex align-items-center gap-2">
+                <input class="form-check-input mt-0 fs-6" type="checkbox"
+                  [checked]="isGroupSelected(group.services)"
+                  [disabled]="deploying()"
+                  (change)="toggleGroupSelection(group.services, $event)"
+                  (click)="$event.stopPropagation()">
+                <span class="small fw-semibold text-info">{{ group.title }}</span>
+                <span class="badge bg-secondary bg-opacity-50 text-light ms-1" style="font-size: 0.7rem;">
+                  {{ getSelectedCountInGroup(group.services) }}/{{ group.services.length }}
+                </span>
+              </div>
+              <i class="bi text-secondary ms-2"
+                [class.bi-chevron-down]="!isGroupCollapsed(group.key)"
+                [class.bi-chevron-right]="isGroupCollapsed(group.key)"></i>
             </div>
 
+            @if (!isGroupCollapsed(group.key)) {
             @for (s of group.services; track s.id) {
             <div class="list-group-item bg-transparent text-white border-bottom border-secondary p-0"
               [class.bg-primary]="selectedServiceIds.has(s.id!)" [class.bg-opacity-10]="selectedServiceIds.has(s.id!)">
@@ -112,6 +128,7 @@
               </div>
               }
             </div>
+            }
             }
             }
           </div>

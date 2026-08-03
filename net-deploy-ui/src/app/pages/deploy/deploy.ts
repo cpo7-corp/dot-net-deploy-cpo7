@@ -61,6 +61,7 @@ export class DeployComponent implements OnInit {
       })
       ;
   });
+  collapsedGroups = signal<Set<string>>(new Set());
   environments = signal<VpsSettings[]>([]);
   selectedEnvironmentId = signal<string | null>(null);
   selectedServiceIds: Set<string> = new Set();
@@ -98,6 +99,18 @@ export class DeployComponent implements OnInit {
   }
 
   ngOnInit() {
+    try {
+      const savedCollapsed = localStorage.getItem('collapsedServiceGroups');
+      if (savedCollapsed) {
+        const parsed = JSON.parse(savedCollapsed);
+        if (Array.isArray(parsed)) {
+          this.collapsedGroups.set(new Set(parsed));
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load collapsed groups from localStorage', e);
+    }
+
     this.servicesSvc.getAll().subscribe({
       next: (data) => {
         this.services.set(data);
@@ -125,6 +138,51 @@ export class DeployComponent implements OnInit {
       localStorage.setItem('lastEnvironmentId', id);
     }
     this.updateDefaultBranches();
+  }
+
+  toggleGroupCollapse(groupKey: string) {
+    const current = new Set(this.collapsedGroups());
+    if (current.has(groupKey)) {
+      current.delete(groupKey);
+    } else {
+      current.add(groupKey);
+    }
+    this.collapsedGroups.set(current);
+    try {
+      localStorage.setItem('collapsedServiceGroups', JSON.stringify(Array.from(current)));
+    } catch (e) {
+      console.error('Failed to save collapsed groups to localStorage', e);
+    }
+  }
+
+  isGroupCollapsed(groupKey: string): boolean {
+    return this.collapsedGroups().has(groupKey);
+  }
+
+  isGroupSelected(services: ServiceStatus[]): boolean {
+    const validServices = services.filter(s => !!s.id);
+    if (validServices.length === 0) return false;
+    return validServices.every(s => this.selectedServiceIds.has(s.id!));
+  }
+
+  getSelectedCountInGroup(services: ServiceStatus[]): number {
+    return services.filter(s => s.id && this.selectedServiceIds.has(s.id)).length;
+  }
+
+  toggleGroupSelection(services: ServiceStatus[], event?: Event) {
+    if (event) {
+      event.stopPropagation();
+    }
+    const allSelected = this.isGroupSelected(services);
+    services.forEach(s => {
+      if (s.id) {
+        if (allSelected) {
+          this.selectedServiceIds.delete(s.id);
+        } else {
+          this.selectedServiceIds.add(s.id);
+        }
+      }
+    });
   }
 
   private updateDefaultBranches() {

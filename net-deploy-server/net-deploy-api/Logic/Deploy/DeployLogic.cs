@@ -136,6 +136,7 @@ public class DeployLogic(
         bool forceClean = false,
         bool skipPull = false,
         bool skipBuildIfOutputExists = false,
+        bool skipHeartbeat = false,
         System.Threading.CancellationToken ct = default)
     {
         var serviceId = service.Id;
@@ -152,7 +153,7 @@ public class DeployLogic(
             try
             {
                 var effectiveClean = attempt == 1 && forceClean;
-                var result = await DeployServiceInternalAsync(service, settings, log, environmentId, branchOverride, vpsOverride, effectiveClean, skipPull, skipBuildIfOutputExists || attempt > 1, ct);
+                var result = await DeployServiceInternalAsync(service, settings, log, environmentId, branchOverride, vpsOverride, effectiveClean, skipPull, skipBuildIfOutputExists || attempt > 1, skipHeartbeat, ct);
                 if (result.Success) return result;
             }
             catch (Exception ex)
@@ -197,6 +198,7 @@ public class DeployLogic(
         bool forceClean,
         bool skipPull,
         bool skipBuildIfOutputExists,
+        bool skipHeartbeat,
         System.Threading.CancellationToken ct)
     {
         var serviceId = service.Id;
@@ -232,7 +234,7 @@ public class DeployLogic(
         await processRunner.KillProcessesInDirectory(envConfig.DeployTargetPath, log, serviceId);
 
         // PHASE 3: TRANSFER & START
-        var result = await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput, currentVersion, ct);
+        var result = await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput, currentVersion, skipHeartbeat, ct);
 
         if (!result.Success)
         {
@@ -246,7 +248,7 @@ public class DeployLogic(
         return result;
     }
 
-    private async Task<(bool Success, bool? Heartbeat, double TransferSeconds, double HeartbeatSeconds)> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput, ProjectVersion? currentVersion = null, System.Threading.CancellationToken ct = default)
+    private async Task<(bool Success, bool? Heartbeat, double TransferSeconds, double HeartbeatSeconds)> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput, ProjectVersion? currentVersion = null, bool skipHeartbeat = false, System.Threading.CancellationToken ct = default)
     {
         var targetPath = envConfig.DeployTargetPath;
         if (string.IsNullOrWhiteSpace(targetPath))
@@ -302,7 +304,7 @@ public class DeployLogic(
 
         bool? heartbeatSuccess = null;
         var heartbeatStart = DateTime.UtcNow;
-        if (!string.IsNullOrWhiteSpace(envConfig.HeartbeatUrl))
+        if (!skipHeartbeat && !string.IsNullOrWhiteSpace(envConfig.HeartbeatUrl))
         {
             heartbeatSuccess = await CheckHeartbeatAsync(envConfig.HeartbeatUrl, log, service.Id);
         }
@@ -574,7 +576,7 @@ public class DeployLogic(
         if (action == "stop") await Task.Delay(3000);
     }
 
-    private async Task<bool> CheckHeartbeatAsync(string url, LogCallback log, string? serviceId)
+    public async Task<bool> CheckHeartbeatAsync(string url, LogCallback log, string? serviceId)
     {
         await log("INFO", $"💓 Checking heartbeat: {url} ...", serviceId);
         try
