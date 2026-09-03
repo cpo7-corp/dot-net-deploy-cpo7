@@ -112,14 +112,14 @@ public class DeployLogic(
             else
             {
                 // For IIS, a recycle is often more robust than stop/start
-                await ManageIisSiteAsync(service.IisSiteName, "recycle", log, service.Id);
-                await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id); // Ensure site is also started
+                await ManageIisSiteAsync(service.IisSiteName, "recycle", log, service.Id, vps);
+                await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id, vps); // Ensure site is also started
             }
         }
         else
         {
             if (isWin) await ManageWindowsServiceAsync(service.IisSiteName, action, log, service.Id, envConfig.DeployTargetPath);
-            else await ManageIisSiteAsync(service.IisSiteName, action, log, service.Id);
+            else await ManageIisSiteAsync(service.IisSiteName, action, log, service.Id, vps);
         }
 
         return true;
@@ -207,6 +207,11 @@ public class DeployLogic(
 
         var publishOutput = Path.Combine(Path.GetTempPath(), "net-deploy", service.Id ?? service.Name);
         var isWindowsService = service.ServiceType == "WindowsService";
+        var isIis = service.ServiceType is "WebApi" or "Mvc";
+        var effectiveVps = vpsOverride ?? settings.VpsEnvironments.FirstOrDefault(e => e.Id == environmentId);
+        var targetPath = isIis && !string.IsNullOrWhiteSpace(envConfig.DeployTargetPath)
+            ? IisDeployment.TargetPath(envConfig.DeployTargetPath, service.IisSiteName)
+            : envConfig.DeployTargetPath;
 
         // PHASE 1: PREPARATION (Pull, Build, Config)
         bool prepSuccess = await PrepAndBuildServiceAsync(service, settings, log, environmentId, branchOverride, forceClean, skipPull, skipBuildIfOutputExists, ct);
@@ -225,16 +230,20 @@ public class DeployLogic(
         catch { }
 
         // PHASE 2: STOP (Site/Service)
+        if (isIis)
+            targetPath = (await IisDeployment.RunAsync(service.IisSiteName, "ensure", targetPath, effectiveVps, processRunner, log, serviceId, envConfig.IisPort))!;
+
         if (isWindowsService)
             await ManageWindowsServiceAsync(service.IisSiteName, "stop", log, serviceId);
         else if (service.ServiceType is "WebApi" or "Mvc")
-            await ManageIisSiteAsync(service.IisSiteName, "stop", log, serviceId);
+            await ManageIisSiteAsync(service.IisSiteName, "stop", log, serviceId, effectiveVps);
 
         // EXTRA: Force kill any remaining processes holding files in target directory
-        await processRunner.KillProcessesInDirectory(envConfig.DeployTargetPath, log, serviceId);
+        if (effectiveVps == null || effectiveVps.IsLocal || string.IsNullOrWhiteSpace(effectiveVps.Host) || effectiveVps.Host is "localhost" or "127.0.0.1")
+            await processRunner.KillProcessesInDirectory(targetPath, log, serviceId);
 
         // PHASE 3: TRANSFER & START
-        var result = await ExecuteTransferPhaseAsync(service, envConfig, vpsOverride, log, isWindowsService, publishOutput, currentVersion, skipHeartbeat, ct);
+        var result = await ExecuteTransferPhaseAsync(service, envConfig, effectiveVps, log, isWindowsService, publishOutput, targetPath, currentVersion, skipHeartbeat, ct);
 
         if (!result.Success)
         {
@@ -242,15 +251,14 @@ public class DeployLogic(
             if (isWindowsService)
                 await ManageWindowsServiceAsync(service.IisSiteName, "start", log, serviceId, envConfig.DeployTargetPath);
             else if (service.ServiceType is "WebApi" or "Mvc")
-                await ManageIisSiteAsync(service.IisSiteName, "start", log, serviceId);
+                await ManageIisSiteAsync(service.IisSiteName, "start", log, serviceId, effectiveVps);
         }
 
         return result;
     }
 
-    private async Task<(bool Success, bool? Heartbeat, double TransferSeconds, double HeartbeatSeconds)> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput, ProjectVersion? currentVersion = null, bool skipHeartbeat = false, System.Threading.CancellationToken ct = default)
+    private async Task<(bool Success, bool? Heartbeat, double TransferSeconds, double HeartbeatSeconds)> ExecuteTransferPhaseAsync(ServiceDefinitionDB service, ServiceEnvironmentConfig envConfig, VpsSettings? vpsOverride, LogCallback log, bool isWindowsService, string publishOutput, string targetPath, ProjectVersion? currentVersion = null, bool skipHeartbeat = false, System.Threading.CancellationToken ct = default)
     {
-        var targetPath = envConfig.DeployTargetPath;
         if (string.IsNullOrWhiteSpace(targetPath))
         {
             await log("ERROR", "❌ Missing DeployTargetPath for service environment.", service.Id);
@@ -270,7 +278,7 @@ public class DeployLogic(
             if (isWindowsService)
                 await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id, targetPath);
             else if (service.ServiceType is "WebApi" or "Mvc")
-                await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id);
+                await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id, vpsOverride);
 
             await log("ERROR", $"❌ Transfer failed after all attempts: {ex.Message}", service.Id);
             logger.LogError(ex, "Failed to copy/upload files to {Target}", targetPath);
@@ -282,7 +290,7 @@ public class DeployLogic(
         if (isWindowsService)
             await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id, targetPath);
         else if (service.ServiceType is "WebApi" or "Mvc")
-            await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id);
+            await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id, vpsOverride);
 
         await log("SUCCESS", $"🚀 Deploy complete for: {service.Name}", service.Id);
 
@@ -557,25 +565,12 @@ public class DeployLogic(
         if (action == "stop") await Task.Delay(2000);
     }
 
-    private async Task ManageIisSiteAsync(string? iisSiteName, string action, LogCallback log, string? serviceId)
+    private async Task ManageIisSiteAsync(string? iisSiteName, string action, LogCallback log, string? serviceId, VpsSettings? vps = null)
     {
         var actionIcon = action == "start" ? "🏁 Starting" : (action == "recycle" ? "♻️ Recycling" : "🛑 Stopping");
         await log("INFO", $"{actionIcon} IIS Site & AppPool: {iisSiteName}...", serviceId);
 
-        var appcmd = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"inetsrv\appcmd.exe");
-        if (!File.Exists(appcmd)) appcmd = "appcmd.exe";
-
-        if (action == "recycle")
-        {
-            await processRunner.RunAsync(appcmd, $"recycle apppool \"{iisSiteName}\"", ".", log, serviceId);
-        }
-        else
-        {
-            await processRunner.RunAsync(appcmd, $"{action} site \"{iisSiteName}\"", ".", log, serviceId);
-            await processRunner.RunAsync(appcmd, $"{action} apppool \"{iisSiteName}\"", ".", log, serviceId);
-        }
-
-        if (action == "stop") await Task.Delay(3000);
+        await IisDeployment.RunAsync(iisSiteName, action, null, vps, processRunner, log, serviceId);
     }
 
     public async Task<bool> CheckHeartbeatAsync(string url, LogCallback log, string? serviceId)

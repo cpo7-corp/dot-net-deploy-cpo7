@@ -37,6 +37,8 @@ public class ServiceEnvironmentConfig
 {
     public string EnvironmentId { get; set; } = string.Empty;
     public string DeployTargetPath { get; set; } = string.Empty;
+    [System.ComponentModel.DataAnnotations.Range(1, 65535)]
+    public int? IisPort { get; set; }
     public string HeartbeatUrl { get; set; } = string.Empty;
     public string DefaultBranch { get; set; } = "main";
 

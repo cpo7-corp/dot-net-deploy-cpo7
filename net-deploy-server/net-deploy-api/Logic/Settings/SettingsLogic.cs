@@ -46,6 +46,7 @@ public class SettingsLogic(MongoDbContext db)
                 vps.Username = vps.Username?.Trim() ?? string.Empty;
                 vps.Password = vps.Password?.Trim() ?? string.Empty;
                 vps.EnvironmentTag = vps.EnvironmentTag?.Trim() ?? string.Empty;
+                vps.DefaultDeployBasePath = vps.DefaultDeployBasePath?.Trim() ?? string.Empty;
 
                 if (vps.SharedVariables != null)
                 {

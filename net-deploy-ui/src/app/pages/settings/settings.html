@@ -93,6 +93,15 @@
                 </div>
               }
 
+              <div class="col-12">
+                <label class="form-label" [for]="'v_defaultPath_' + $index">{{ 'defaultDeployBasePath' | translate }}</label>
+                <input type="text" class="form-control bg-dark text-white border-secondary" dir="ltr"
+                       [(ngModel)]="vps.defaultDeployBasePath" [name]="'v_defaultPath_' + $index"
+                       [id]="'v_defaultPath_' + $index" [attr.aria-describedby]="'v_defaultPathHelp_' + $index"
+                       placeholder="C:\inetpub\wwwroot">
+                <div class="form-text text-secondary" [id]="'v_defaultPathHelp_' + $index">{{ 'defaultDeployBasePathHelp' | translate }}</div>
+              </div>
+
               <!-- Shared Variables Section -->
               <div class="col-12 mt-4">
                 <div class="d-flex justify-content-between align-items-center mb-2">

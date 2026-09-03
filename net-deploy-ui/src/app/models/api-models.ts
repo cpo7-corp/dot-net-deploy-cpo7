@@ -18,6 +18,7 @@ export interface VpsSettings {
   port: number;
   isLocal: boolean;
   environmentTag: string;
+  defaultDeployBasePath?: string;
   sharedVariables?: EnvVariable[];
   sharedFileRenames?: FileRename[];
 }
@@ -72,6 +73,7 @@ export interface ServiceDefinition {
 export interface ServiceEnvironmentConfig {
   environmentId: string;
   deployTargetPath: string;
+  iisPort?: number | null;
   heartbeatUrl: string;
   defaultBranch: string;
   configSetIds: string[];

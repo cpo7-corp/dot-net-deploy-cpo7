@@ -1,4 +1,10 @@
 {
+  "iisSitePathOptional": "New IIS site folder (optional)",
+  "iisSitePathHelp": "Full destination path for a new site, used before the VPS default. Leave empty to use the VPS default folder plus the site name. Existing sites always use their current IIS physical path.",
+  "iisPortOptional": "IIS port (optional)",
+  "iisPortHelp": "Used only when creating a missing IIS site in this environment. Defaults to 80. Existing site bindings are preserved.",
+  "defaultDeployBasePath": "Default folder for new IIS sites",
+  "defaultDeployBasePathHelp": "Used when the IIS site does not exist and the service has no target path. A subfolder named after the site is created here. If empty, C:\\inetpub\\wwwroot is used. Existing sites keep their IIS path when no service path is set.",
   "appTitle": "Deploy.NET",
   "dashboard": "Dashboard",
   "deployApp": "Deploy App",

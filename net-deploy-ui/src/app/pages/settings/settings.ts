@@ -53,6 +53,7 @@ export class SettingsComponent implements OnInit {
       port: 22,
       isLocal: false,
       environmentTag: '',
+      defaultDeployBasePath: '',
       sharedVariables: [],
       sharedFileRenames: []
     };

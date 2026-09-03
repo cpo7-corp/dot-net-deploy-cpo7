@@ -53,6 +53,19 @@ The easiest way to get everything up and running is with **Docker Compose**. Thi
 - Choose the target environment.
 - Click **Deploy Selected** to start the automated process.
 
+### Automatic IIS setup
+
+For WebAPI and MVC deployments, the destination folder is named after `IisSiteName`.
+For example, `D:\Sites\old-folder` becomes `D:\Sites\api.example.com` when the IIS site name is `api.example.com`.
+When the service target path is empty, an existing site's IIS physical path is used.
+For a missing site, the **Default folder for new IIS sites** setting under **VPS Environments** supplies the base folder: `D:\Sites` creates `D:\Sites\<IisSiteName>`.
+If both settings are empty and the site is missing, the path defaults to `C:\inetpub\wwwroot\<IisSiteName>`.
+The site's root physical path and the file transfer destination both use this resolved path.
+
+Missing sites and application pools are created automatically. A new site uses the optional **IIS port** from the service's environment configuration (1–65535, default 80), with the site name as its HTTP host header, so automatic creation requires a valid host name. Configure DNS and any HTTPS certificate/binding separately. Existing bindings are preserved; an existing site's physical path is updated to the resolved destination.
+
+IIS setup and start/stop commands run on the selected Windows server (over SSH for a remote environment). Windows PowerShell and IIS management components must be available there, and the deployment account needs permission to manage IIS and write to the destination. A failed IIS setup or start fails the deployment instead of reporting success.
+
 ## System Requirements
 
 > ⚠️ All of the following must be installed on the **server machine** that runs the API.

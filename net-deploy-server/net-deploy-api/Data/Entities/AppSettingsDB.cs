@@ -30,6 +30,7 @@ public class VpsSettings
     public int Port { get; set; } = 22;
     public bool IsLocal { get; set; } = false;
     public string EnvironmentTag { get; set; } = string.Empty;
+    public string DefaultDeployBasePath { get; set; } = string.Empty;
 
     public List<EnvVariable> SharedVariables { get; set; } = new();
     public List<FileRename> SharedFileRenames { get; set; } = new();
