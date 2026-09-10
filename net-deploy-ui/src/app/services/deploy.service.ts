@@ -16,6 +16,10 @@ export class DeployService extends ApiService {
   failedServiceIds = signal<string[]>([]);
   currentSessionId = signal<string | null>(null);
   isPaused = signal<boolean>(false);
+  preparedDeployment = signal<{
+    configs: { serviceId: string, branch: string }[];
+    environmentId: string | null;
+  } | null>(null);
   
   // Strategy options
   deployPull = signal<boolean>(true);
@@ -40,6 +44,10 @@ export class DeployService extends ApiService {
     deploy: boolean,
     waitAllBuildsToDeploy: boolean = this.deployWaitAllBuilds()
   ) {
+    if (deploy) {
+      this.preparedDeployment.set(null);
+    }
+
     this.deploying.set(true);
     this.logs.set([]);
     this.failedServiceIds.set([]);
@@ -72,12 +80,20 @@ export class DeployService extends ApiService {
         }
       },
       complete: () => {
+        if (!deploy && !this.failedServiceIds().length) {
+          this.preparedDeployment.set({
+            configs: configs.map(config => ({ ...config })),
+            environmentId
+          });
+        }
+
         this.deploying.set(false);
         this.currentSessionId.set(null);
         this.isPaused.set(false);
         this.stopTimer();
       },
       error: (err: any) => {
+        this.preparedDeployment.set(null);
         this.deploying.set(false);
         this.currentSessionId.set(null);
         this.isPaused.set(false);

@@ -132,6 +132,70 @@ public class DeployController(
             var repoUpdateTasks = new ConcurrentDictionary<string, Task<bool>>();
             var servicePrepTasks = new ConcurrentDictionary<string, Task<(bool Success, double BuildSeconds)>>();
 
+            async Task<bool> DownloadAllRepositoriesAsync()
+            {
+                if (!request.Pull) return true;
+
+                await Log("INFO", "📥 [PHASE 1] Downloading all repositories before builds...");
+                var repoBranches = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                var downloadRequests = new List<(ServiceDefinitionDB Service, string? BranchOverride, string RepoKey)>();
+
+                foreach (var config in request.Services)
+                {
+                    var service = await servicesLogic.GetByIdAsync(config.ServiceId);
+                    if (service == null)
+                    {
+                        await Log("ERROR", $"❌ Service {config.ServiceId} not found.");
+                        return false;
+                    }
+
+                    var envConfig = service.Environments.FirstOrDefault(e => e.EnvironmentId == vpsSettings.Id);
+                    if (envConfig == null)
+                    {
+                        await Log("ERROR", $"❌ Environment configuration not found for {service.Name}.", service.Id);
+                        return false;
+                    }
+
+                    var (repoUrl, parsedBranch, _) = deployLogic.ParseGitUrl(service.RepoUrl);
+                    var branch = config.Branch ?? (string.IsNullOrWhiteSpace(envConfig.DefaultBranch) ? parsedBranch : envConfig.DefaultBranch);
+                    var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl);
+
+                    if (repoBranches.TryGetValue(repoLocalPath, out var existingBranch) &&
+                        !string.Equals(existingBranch, branch, StringComparison.OrdinalIgnoreCase))
+                    {
+                        await Log("ERROR", $"❌ Repository {repoLocalPath} cannot use branches {existingBranch} and {branch} in the same deployment.");
+                        return false;
+                    }
+
+                    repoBranches[repoLocalPath] = branch;
+                    var repoKey = $"{repoLocalPath.ToLowerInvariant()}|{branch.ToLowerInvariant()}";
+                    downloadRequests.Add((service, config.Branch, repoKey));
+                }
+
+                var downloadTasks = downloadRequests
+                    .Select(item => repoUpdateTasks.GetOrAdd(
+                        item.RepoKey,
+                        _ => deployLogic.PrepGitOnlyAsync(
+                            item.Service,
+                            settings,
+                            Log,
+                            vpsSettings.Id,
+                            item.BranchOverride,
+                            request.ForceClean,
+                            cts.Token)))
+                    .ToList();
+
+                var downloadResults = await Task.WhenAll(downloadTasks);
+                if (downloadResults.Any(success => !success))
+                {
+                    await Log("ERROR", "❌ One or more repository downloads failed. Builds were not started.");
+                    return false;
+                }
+
+                await Log("SUCCESS", "✅ [PHASE 1] All repositories are ready. Starting builds...");
+                return true;
+            }
+
             Task<(bool Success, double BuildSeconds)> EnsureServicePrepared(ServiceDefinitionDB srv, string? branchOverride)
             {
                 var envCfg = srv.Environments.FirstOrDefault(e => e.EnvironmentId == vpsSettings.Id);
@@ -142,16 +206,6 @@ public class DeployController(
                 return servicePrepTasks.GetOrAdd(prepKey, async _ =>
                 {
                     var prepStart = DateTime.UtcNow;
-                    var (repoUrl, gitBranch, _) = deployLogic.ParseGitUrl(srv.RepoUrl);
-                    var effectiveRepoBranch = branchOverride ?? (string.IsNullOrWhiteSpace(envCfg?.DefaultBranch) ? gitBranch : envCfg.DefaultBranch);
-                    var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl);
-                    var repoKey = $"{repoLocalPath.ToLowerInvariant()}|{effectiveRepoBranch}";
-
-                    var repoUpdated = !request.Pull || await repoUpdateTasks.GetOrAdd(repoKey, _ =>
-                        deployLogic.PrepGitOnlyAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, cts.Token)
-                    );
-
-                    if (!repoUpdated) return (false, (DateTime.UtcNow - prepStart).TotalSeconds);
                     var success = await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, skipBuildIfOutputExists: !request.Build, cts.Token);
                     return (success, (DateTime.UtcNow - prepStart).TotalSeconds);
                 });
@@ -160,6 +214,8 @@ public class DeployController(
             var sessionStartTime = DateTime.UtcNow;
             var results = new ConcurrentBag<ServiceStatus>();
             var deployedForHeartbeat = new ConcurrentBag<(ServiceStatus Status, ServiceDefinitionDB Service, ServiceEnvironmentConfig EnvCfg)>();
+
+            if (!await DownloadAllRepositoriesAsync()) return;
 
             async Task ProcessServiceDeployment(ServiceDeploymentConfig config)
             {
@@ -212,7 +268,7 @@ public class DeployController(
             {
                 if (request.Pull || request.Build)
                 {
-                    await Log("INFO", "🔍 [PHASE 1] Building all services in parallel (waiting for all builds before deploy)...");
+                    await Log("INFO", "🔨 [PHASE 2] Building all services (waiting for all builds before deploy)...");
                     var prepTasks = request.Services.Select(async config =>
                     {
                         if (cts.IsCancellationRequested) return;
@@ -222,10 +278,10 @@ public class DeployController(
                     });
                     await Task.WhenAll(prepTasks);
                     if (cts.IsCancellationRequested) { await Log("WARNING", "🛑 Deployment cancelled after preparation phase."); return; }
-                    await Log("INFO", "✅ [PHASE 1] All service builds completed. Starting deployment phase...");
+                    await Log("INFO", "✅ [PHASE 2] All service builds completed. Starting deployment phase...");
                 }
 
-                await Log("INFO", "🚀 [PHASE 2] Deploying all services in parallel...");
+                await Log("INFO", "🚀 [PHASE 3] Deploying all services in parallel...");
                 await Task.WhenAll(request.Services.Select(config => ProcessServiceDeployment(config)));
             }
             else

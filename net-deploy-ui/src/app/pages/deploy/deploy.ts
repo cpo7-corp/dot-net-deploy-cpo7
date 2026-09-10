@@ -89,6 +89,7 @@ export class DeployComponent implements OnInit {
   elapsedTime = this.deploySvc.elapsedTime;
   failedServiceIds = this.deploySvc.failedServiceIds;
   isPaused = this.deploySvc.isPaused;
+  preparedDeployment = this.deploySvc.preparedDeployment;
 
   constructor() {
     // Scroll to bottom when logs change
@@ -247,6 +248,21 @@ export class DeployComponent implements OnInit {
     }));
 
     this.startDeploy(configs, false, 3);
+  }
+
+  deployPrepared() {
+    const prepared = this.preparedDeployment();
+    if (!prepared) return;
+
+    this.deploySvc.startDeployment(
+      prepared.configs,
+      prepared.environmentId,
+      false,
+      false,
+      false,
+      true,
+      false
+    );
   }
 
   stopDeployment() {

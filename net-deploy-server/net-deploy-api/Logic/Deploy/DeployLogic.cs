@@ -1,7 +1,6 @@
 using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.Services;
-using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -17,9 +16,6 @@ public class DeployLogic(
     NET.Deploy.Api.Logic.DeployHistory.DeployHistoryLogic deployHistoryLogic,
     ServicesLogic servicesLogic)
 {
-    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _repoLocks = new();
-    private SemaphoreSlim GetRepoLock(string path) => _repoLocks.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
-
     public (string RepoUrl, string Branch, string ProjectPath) ParseGitUrl(string fullUrl) => gitLogic.ParseGitUrl(fullUrl);
 
     public async Task<bool> PrepAndBuildServiceAsync(
@@ -58,7 +54,7 @@ public class DeployLogic(
         var projectFullPath = Path.Combine(repoLocalPath, effectiveProjectPath);
 
         // LOCK START: Ensure only one service works on this repository folder at a time
-        var @lock = GetRepoLock(repoLocalPath);
+        var @lock = RepositoryLockManager.Get(repoLocalPath);
         await @lock.WaitAsync(ct);
 
         try
@@ -68,6 +64,12 @@ public class DeployLogic(
                 await log("INFO", $"📥 [Prep] Pulling latest for {service.Name} ({effectiveBranch})...", service.Id);
                 if (!await gitLogic.PullAsync(settings.Git, repoUrl, effectiveBranch, log, effectiveProjectPath, forceClean, ct))
                     return false;
+            }
+
+            if (!File.Exists(projectFullPath) && !Directory.Exists(projectFullPath))
+            {
+                await log("ERROR", $"❌ [Prep] Project path not found: {projectFullPath}", service.Id);
+                return false;
             }
 
             if (Directory.Exists(publishOutput))

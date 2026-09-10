@@ -178,7 +178,7 @@
           <button class="btn btn-primary w-100 py-3 fs-5 fw-bold" (click)="startDeploy()"
             [disabled]="selectedServiceIds.size === 0 || deploying()">
             @if (!deploying()) {
-            <span>{{ 'deploySelected' | translate }} ({{selectedServiceIds.size}})</span>
+            <span>{{ 'startSelected' | translate }} ({{selectedServiceIds.size}})</span>
             } @else {
             <span class="deploying-pulse">
               <div class="spinner-grow spinner-grow-sm me-2" role="status"></div>
@@ -186,6 +186,13 @@
             </span>
             }
           </button>
+
+          @if (preparedDeployment() && !deploying()) {
+          <button class="btn btn-success w-100 mt-2 py-3 fs-5 fw-bold" (click)="deployPrepared()">
+            <i class="bi bi-rocket-takeoff me-2"></i>
+            {{ 'deployPrepared' | translate }}
+          </button>
+          }
 
           @if (deploying()) {
           <div class="d-flex gap-2 mt-2">
