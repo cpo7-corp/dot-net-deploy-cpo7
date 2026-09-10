@@ -39,6 +39,11 @@ public class ServicesLogic(MongoDbContext db)
         service.ProjectPath = service.ProjectPath?.Trim() ?? string.Empty;
         service.IisSiteName = service.IisSiteName?.Trim() ?? string.Empty;
         service.ServiceType = service.ServiceType?.Trim() ?? "WebApi";
+        service.DockerfilePath = service.DockerfilePath?.Trim();
+        service.DockerComposePath = service.DockerComposePath?.Trim();
+        service.DockerContainerName = service.DockerContainerName?.Trim();
+        service.DockerComposeServiceName = service.DockerComposeServiceName?.Trim();
+        service.DockerComposeProjectName = service.DockerComposeProjectName?.Trim();
 
         if (service.Environments != null)
         {
@@ -47,6 +52,7 @@ public class ServicesLogic(MongoDbContext db)
                 env.DeployTargetPath = env.DeployTargetPath?.Trim() ?? string.Empty;
                 env.HeartbeatUrl = env.HeartbeatUrl?.Trim() ?? string.Empty;
                 env.DefaultBranch = env.DefaultBranch?.Trim() ?? "main";
+                env.DockerEnvironmentComposePath = env.DockerEnvironmentComposePath?.Trim();
                 env.ConfigSetIds = env.ConfigSetIds?
                     .Where(id => !string.IsNullOrWhiteSpace(id))
                     .Select(id => id.Trim())

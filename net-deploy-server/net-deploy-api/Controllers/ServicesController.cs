@@ -3,26 +3,39 @@ using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.IIS;
 using NET.Deploy.Api.Logic.Services;
 using NET.Deploy.Api.Logic.Services.Entities;
+using NET.Deploy.Api.Logic.Settings;
 using System.Net;
 
 namespace NET.Deploy.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, ILogger<ServicesController> logger) : ControllerBase
+public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, NET.Deploy.Api.Logic.Docker.DockerLogic dockerLogic, SettingsLogic settingsLogic, ILogger<ServicesController> logger) : ControllerBase
 {
-    /// <summary>Returns all services with their live IIS status.</summary>
+    /// <summary>Returns all services with their live IIS / Docker status.</summary>
     [HttpGet]
-    public async Task<ActionResult<List<ServiceStatus>>> GetAll()
+    public async Task<ActionResult<List<ServiceStatus>>> GetAll([FromQuery] string? environmentId = null)
     {
         var services = await servicesLogic.GetAllAsync();
+        var settings = await settingsLogic.GetAsync();
+        var vps = settings.VpsEnvironments.FirstOrDefault(environment => environment.Id == environmentId);
 
         var statuses = await Task.WhenAll(services.Select(async s =>
         {
             string status = "Unknown";
             try
             {
-                status = await iisLogic.GetStatusAsync(s.IisSiteName, s.ServiceType);
+                if (s.ServiceType is "Docker" or "DockerCompose")
+                {
+                    var containerName = !string.IsNullOrWhiteSpace(s.DockerContainerName)
+                        ? s.DockerContainerName
+                        : (!string.IsNullOrWhiteSpace(s.IisSiteName) ? s.IisSiteName : s.Name.ToLowerInvariant().Replace(" ", "-"));
+                    status = await dockerLogic.GetStatusAsync(containerName, vps);
+                }
+                else
+                {
+                    status = await iisLogic.GetStatusAsync(s.IisSiteName, s.ServiceType);
+                }
             }
             catch { /* log and silent */ }
 
@@ -37,6 +50,11 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
                 ProjectPath = s.ProjectPath,
                 LastDeployed = s.LastDeployed,
                 CompileSingleFile = s.CompileSingleFile,
+                DockerfilePath = s.DockerfilePath,
+                DockerComposePath = s.DockerComposePath,
+                DockerContainerName = s.DockerContainerName,
+                DockerComposeServiceName = s.DockerComposeServiceName,
+                DockerComposeProjectName = s.DockerComposeProjectName,
                 Environments = s.Environments,
                 Status = status
             };

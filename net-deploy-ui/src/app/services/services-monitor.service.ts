@@ -8,8 +8,10 @@ import { Observable } from 'rxjs';
 })
 export class ServicesMonitorService extends ApiService {
 
-  getAll(): Observable<ServiceStatus[]> {
-    return this.http.get<ServiceStatus[]>(`${this.baseUrl}/services`);
+  getAll(environmentId?: string | null): Observable<ServiceStatus[]> {
+    return this.http.get<ServiceStatus[]>(`${this.baseUrl}/services`, {
+      params: environmentId ? { environmentId } : {}
+    });
   }
 
   getHeartbeats(environmentId: string): Observable<ServiceHeartbeatStatus[]> {

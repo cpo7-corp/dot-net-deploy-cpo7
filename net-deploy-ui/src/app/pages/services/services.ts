@@ -107,7 +107,7 @@ export class ServicesComponent implements OnInit {
 
   loadData() {
     this.loading.set(true);
-    this.servicesSvc.getAll().subscribe({
+    this.servicesSvc.getAll(this.targetEnvId).subscribe({
       next: (data) => {
         this.services.set(data);
         this.loading.set(false);
@@ -184,7 +184,7 @@ export class ServicesComponent implements OnInit {
         this.targetEnvId = envs[0].id || null;
       }
 
-      this.checkHeartbeats();
+      this.loadData();
     });
   }
 
@@ -250,6 +250,14 @@ export class ServicesComponent implements OnInit {
     return this.environments();
   }
 
+  getEnvironmentName(id: string): string {
+    return this.environments().find(e => e.id === id)?.name || id;
+  }
+
+  getEnvironmentTag(id: string): string {
+    return this.environments().find(e => e.id === id)?.environmentTag || '';
+  }
+
   openAddModal() {
     this.newService = this.resetNewService();
     this.isAddModalOpen = true;
@@ -286,7 +294,9 @@ export class ServicesComponent implements OnInit {
         };
         this.selectedService!.environments.push(cfg);
       }
-      if (cfg && !cfg.configSetIds) cfg.configSetIds = [];
+      if (cfg && !cfg.configSetIds) {
+        cfg.configSetIds = [];
+      }
     });
 
     this.activeEnvTab = 'general';
@@ -328,6 +338,11 @@ export class ServicesComponent implements OnInit {
       iisSiteName: '', 
       serviceType: 'WebApi', 
       compileSingleFile: false,
+      dockerfilePath: 'Dockerfile',
+      dockerComposePath: 'docker-compose.yml',
+      dockerContainerName: '',
+      dockerComposeServiceName: '',
+      dockerComposeProjectName: '',
       environments: [] 
     };
   }
@@ -345,27 +360,90 @@ export class ServicesComponent implements OnInit {
     return withoutGitSuffix || null;
   }
 
+  selectEnvTab(tab?: string) {
+    if (!tab) return;
+    this.activeEnvTab = tab;
+    if (tab !== 'general' && this.selectedService) {
+      this.getEnvConfig(tab); // Ensure config object exists in environments array
+    }
+  }
+
+  get activeEnvConfig(): ServiceEnvironmentConfig | null {
+    if (!this.selectedService || !this.activeEnvTab || this.activeEnvTab === 'general') return null;
+    return this.selectedService.environments?.find(e => e.environmentId === this.activeEnvTab) || null;
+  }
+
   getEnvConfig(envId: string): ServiceEnvironmentConfig {
-    if (!this.selectedService || !this.selectedService.environments) return {} as any;
-    const config = this.selectedService.environments.find(e => e.environmentId === envId);
-    return config || ({} as any);
+    if (!this.selectedService) return {} as any;
+    if (!this.selectedService.environments) this.selectedService.environments = [];
+    let config = this.selectedService.environments.find(e => e.environmentId === envId);
+    if (!config && envId) {
+      config = {
+        environmentId: envId,
+        deployTargetPath: '',
+        dockerPort: 8080,
+        dockerReplicas: 2,
+        dockerParallelism: 1,
+        dockerDrainSeconds: 10,
+        enableZeroDowntime: true,
+        dockerEnvironmentComposePath: '',
+        heartbeatUrl: '',
+        defaultBranch: 'main',
+        configSetIds: []
+      };
+      this.selectedService.environments.push(config);
+    }
+    if (config && !config.configSetIds) {
+      config.configSetIds = [];
+    }
+    return config || {
+      environmentId: envId,
+      deployTargetPath: '',
+      heartbeatUrl: '',
+      defaultBranch: 'main',
+      configSetIds: []
+    };
   }
 
   toggleConfigSet(envId: string, setId: string) {
-    const cfg = this.getEnvConfig(envId);
-    if (!cfg.configSetIds) cfg.configSetIds = [];
-    
-    const index = cfg.configSetIds.indexOf(setId);
-    if (index > -1) cfg.configSetIds.splice(index, 1);
-    else cfg.configSetIds.push(setId);
+    if (!envId || envId === 'general' || !this.selectedService) return;
+
+    const environments = this.selectedService.environments ?? [];
+    const existingConfig = environments.find(environment => environment.environmentId === envId);
+    const config = existingConfig ?? this.createEnvironmentConfig(envId);
+    const currentIds = [...(config.configSetIds ?? [])];
+    const index = currentIds.indexOf(setId);
+    if (index > -1) {
+      currentIds.splice(index, 1);
+    } else {
+      currentIds.push(setId);
+    }
+
+    const updatedConfig = { ...config, configSetIds: currentIds };
+    const updatedEnvironments = existingConfig
+      ? environments.map(environment => environment.environmentId === envId ? updatedConfig : environment)
+      : [...environments, updatedConfig];
+
+    this.selectedService = {
+      ...this.selectedService,
+      environments: updatedEnvironments
+    };
+  }
+
+  isDockerEnvironment(id: string | null): boolean {
+    if (!id || id === 'general') return false;
+    const serverType = this.environments().find(environment => environment.id === id)?.serverType;
+    return serverType === 'LinuxDocker' || serverType === 'WindowsDocker';
   }
 
   isConfigSetSelected(envId: string, setId: string): boolean {
+    if (!envId || envId === 'general') return false;
     const cfg = this.getEnvConfig(envId);
-    return cfg.configSetIds?.includes(setId) || false;
+    return cfg.configSetIds ? cfg.configSetIds.includes(setId) : false;
   }
 
   getSelectedConfigSets(envId: string): EnvConfigSet[] {
+    if (!envId || envId === 'general') return [];
     const ids = this.getEnvConfig(envId).configSetIds || [];
     return this.allConfigSets().filter(s => ids.includes(s.id!));
   }
@@ -373,6 +451,22 @@ export class ServicesComponent implements OnInit {
   openConfigLookup() {
     this.configSearchQuery = '';
     this.isConfigLookupOpen = true;
+  }
+
+  private createEnvironmentConfig(environmentId: string): ServiceEnvironmentConfig {
+    return {
+      environmentId,
+      deployTargetPath: '',
+      dockerPort: 8080,
+      dockerReplicas: 2,
+      dockerParallelism: 1,
+      dockerDrainSeconds: 10,
+      enableZeroDowntime: true,
+      dockerEnvironmentComposePath: '',
+      heartbeatUrl: '',
+      defaultBranch: 'main',
+      configSetIds: []
+    };
   }
 
   closeConfigLookup() {

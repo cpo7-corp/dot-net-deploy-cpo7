@@ -118,7 +118,10 @@ export class DeployService extends ApiService {
       row.compiled = 'process';
       if (!row.buildStartTime) row.buildStartTime = Date.now();
     }
-    if (message.includes('✅ [Prep] Prepared') || message.includes('⏭️ [Prep] Build output already exists') || (message.includes('✅') && message.includes('built'))) {
+    if (message.includes('✅ [Prep] Prepared') ||
+        message.includes('⏭️ [Prep] Build output already exists') ||
+        message.includes('🐳 [Docker] Repository ready') ||
+        (message.includes('✅') && message.includes('built'))) {
       row.compiled = 'success';
       if (row.buildStartTime && !row.buildTime) {
         row.buildTime = ((Date.now() - row.buildStartTime) / 1000).toFixed(1) + 's';
@@ -132,7 +135,9 @@ export class DeployService extends ApiService {
     }
 
     // DEPLOY PHASE
-    if (message.includes('🚀 Uploading files') || message.includes('📂 Copying files')) {
+    if (message.includes('🚀 Uploading files') ||
+        message.includes('📂 Copying files') ||
+        message.includes('🐳 [Docker] Deploying with Docker Compose')) {
       if (row.compiled === 'process' || row.compiled === 'pending') {
         row.compiled = 'success';
         if (row.buildStartTime && !row.buildTime) {
@@ -142,7 +147,12 @@ export class DeployService extends ApiService {
       row.deployed = 'process';
       if (!row.deployStartTime) row.deployStartTime = Date.now();
     }
-    if (message.includes('✅ Files uploaded') || message.includes('✅ Files copied') || message.includes('🚀 Deploy complete') || message.includes('finished deployment successfully') || message.includes('Recording version')) {
+    if (message.includes('✅ Files uploaded') ||
+        message.includes('✅ Files copied') ||
+        message.includes('✅ [Docker] Containers deployed') ||
+        message.includes('🚀 Deploy complete') ||
+        message.includes('finished deployment successfully') ||
+        message.includes('Recording version')) {
       if (row.compiled === 'process' || row.compiled === 'pending') {
         row.compiled = 'success';
       }
@@ -151,7 +161,9 @@ export class DeployService extends ApiService {
         row.deployTime = ((Date.now() - row.deployStartTime) / 1000).toFixed(1) + 's';
       }
     }
-    if (message.includes('❌ Failed to transfer') || message.includes('❌ Deploy failed')) {
+    if (message.includes('❌ Failed to transfer') ||
+        message.includes('❌ Deploy failed') ||
+        message.includes('❌ [Docker] Docker Compose deployment failed')) {
       row.deployed = 'error';
       if (row.deployStartTime && !row.deployTime) {
         row.deployTime = ((Date.now() - row.deployStartTime) / 1000).toFixed(1) + 's';

@@ -32,6 +32,15 @@ public class VpsSettings
     public string EnvironmentTag { get; set; } = string.Empty;
     public string DefaultDeployBasePath { get; set; } = string.Empty;
 
+    // Docker Specific Environment Settings
+    /// <summary>Windows | LinuxDocker | WindowsDocker</summary>
+    public string ServerType { get; set; } = "Windows";
+    public string DefaultDockerBasePath { get; set; } = "/opt/net-deploy";
+    public bool UseSudoDocker { get; set; } = false;
+    public string DockerRegistryUrl { get; set; } = string.Empty;
+    public string DockerRegistryUsername { get; set; } = string.Empty;
+    public string DockerRegistryPassword { get; set; } = string.Empty;
+
     public List<EnvVariable> SharedVariables { get; set; } = new();
     public List<FileRename> SharedFileRenames { get; set; } = new();
 }

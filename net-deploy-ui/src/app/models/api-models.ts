@@ -10,7 +10,7 @@ export interface GitSettings {
 }
 
 export interface VpsSettings {
-  id: string;
+  id?: string;
   name: string;
   host: string;
   username: string;
@@ -19,6 +19,12 @@ export interface VpsSettings {
   isLocal: boolean;
   environmentTag: string;
   defaultDeployBasePath?: string;
+  serverType?: 'Windows' | 'LinuxDocker' | 'WindowsDocker';
+  defaultDockerBasePath?: string;
+  useSudoDocker?: boolean;
+  dockerRegistryUrl?: string;
+  dockerRegistryUsername?: string;
+  dockerRegistryPassword?: string;
   sharedVariables?: EnvVariable[];
   sharedFileRenames?: FileRename[];
 }
@@ -62,8 +68,13 @@ export interface ServiceDefinition {
   repoUrl: string;
   projectPath: string;
   iisSiteName: string;
-  serviceType: 'WebApi' | 'Mvc' | 'WindowsService' | 'Angular' | 'React';
+  serviceType: 'WebApi' | 'Mvc' | 'WindowsService' | 'Angular' | 'React' | 'Docker' | 'DockerCompose';
   compileSingleFile: boolean;
+  dockerfilePath?: string;
+  dockerComposePath?: string;
+  dockerContainerName?: string;
+  dockerComposeServiceName?: string;
+  dockerComposeProjectName?: string;
   lastDeployed?: string | Date;
   environments: ServiceEnvironmentConfig[];
   order?: number;
@@ -74,6 +85,12 @@ export interface ServiceEnvironmentConfig {
   environmentId: string;
   deployTargetPath: string;
   iisPort?: number | null;
+  dockerPort?: number | null;
+  dockerReplicas?: number;
+  dockerParallelism?: number;
+  dockerDrainSeconds?: number;
+  enableZeroDowntime?: boolean;
+  dockerEnvironmentComposePath?: string;
   heartbeatUrl: string;
   defaultBranch: string;
   configSetIds: string[];

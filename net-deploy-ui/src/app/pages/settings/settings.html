@@ -93,14 +93,53 @@
                 </div>
               }
 
-              <div class="col-12">
-                <label class="form-label" [for]="'v_defaultPath_' + $index">{{ 'defaultDeployBasePath' | translate }}</label>
-                <input type="text" class="form-control bg-dark text-white border-secondary" dir="ltr"
-                       [(ngModel)]="vps.defaultDeployBasePath" [name]="'v_defaultPath_' + $index"
-                       [id]="'v_defaultPath_' + $index" [attr.aria-describedby]="'v_defaultPathHelp_' + $index"
-                       placeholder="C:\inetpub\wwwroot">
+              <div class="col-md-4">
+                <label class="form-label text-info small">{{ 'environmentType' | translate }}</label>
+                <select class="form-select bg-dark text-white border-secondary" [(ngModel)]="vps.serverType" [name]="'v_serverType_' + $index">
+                  <option value="Windows">{{ 'windowsIisServices' | translate }}</option>
+                  <option value="LinuxDocker">{{ 'linuxDockerHost' | translate }}</option>
+                  <option value="WindowsDocker">{{ 'windowsDockerHost' | translate }}</option>
+                </select>
+              </div>
+
+              <div class="col-md-8">
+                <label class="form-label" [for]="'v_defaultPath_' + $index">{{ (vps.serverType === 'LinuxDocker' || vps.serverType === 'WindowsDocker' ? 'defaultDockerProjectPath' : 'defaultDeployBasePath') | translate }}</label>
+                @if (vps.serverType === 'Windows') {
+                  <input type="text" class="form-control bg-dark text-white border-secondary" dir="ltr"
+                         [(ngModel)]="vps.defaultDeployBasePath" [name]="'v_defaultPath_' + $index"
+                         [id]="'v_defaultPath_' + $index" [attr.aria-describedby]="'v_defaultPathHelp_' + $index"
+                         placeholder="C:\\inetpub\\wwwroot">
+                } @else {
+                  <input type="text" class="form-control bg-dark text-white border-secondary" dir="ltr"
+                         [(ngModel)]="vps.defaultDockerBasePath" [name]="'v_defaultPath_' + $index"
+                         [id]="'v_defaultPath_' + $index" [attr.aria-describedby]="'v_defaultPathHelp_' + $index"
+                         [placeholder]="vps.serverType === 'LinuxDocker' ? '/opt/net-deploy' : 'C:\\net-deploy'">
+                }
                 <div class="form-text text-secondary" [id]="'v_defaultPathHelp_' + $index">{{ 'defaultDeployBasePathHelp' | translate }}</div>
               </div>
+
+              @if (vps.serverType === 'LinuxDocker' || vps.serverType === 'WindowsDocker') {
+                @if (vps.serverType === 'LinuxDocker') {
+                  <div class="col-12">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" [(ngModel)]="vps.useSudoDocker" [name]="'v_useSudoDocker_' + $index" [id]="'v_useSudoDocker_' + $index">
+                      <label class="form-check-label text-secondary small" [for]="'v_useSudoDocker_' + $index">{{ 'useSudoDocker' | translate }}</label>
+                    </div>
+                  </div>
+                }
+                <div class="col-md-4">
+                  <label class="form-label text-secondary small">{{ 'dockerRegistryUrlOptional' | translate }}</label>
+                  <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.dockerRegistryUrl" [name]="'v_regUrl_' + $index" placeholder="docker.io">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label text-secondary small">{{ 'registryUsername' | translate }}</label>
+                  <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.dockerRegistryUsername" [name]="'v_regUser_' + $index">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label text-secondary small">{{ 'registryPasswordToken' | translate }}</label>
+                  <input type="password" class="form-control bg-dark text-white border-secondary" [(ngModel)]="vps.dockerRegistryPassword" [name]="'v_regPass_' + $index">
+                </div>
+              }
 
               <!-- Shared Variables Section -->
               <div class="col-12 mt-4">

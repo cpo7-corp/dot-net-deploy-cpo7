@@ -6,8 +6,26 @@ namespace NET.Deploy.Api.Logic.Settings;
 
 public class SettingsLogic(MongoDbContext db)
 {
-    public async Task<AppSettingsDB> GetAsync() =>
-        await db.Settings.Find(_ => true).FirstOrDefaultAsync() ?? new AppSettingsDB();
+    public async Task<AppSettingsDB> GetAsync()
+    {
+        var settings = await db.Settings.Find(_ => true).FirstOrDefaultAsync() ?? new AppSettingsDB();
+        var hasMissingEnvironmentIds = settings.VpsEnvironments.Any(vps => string.IsNullOrWhiteSpace(vps.Id));
+        if (!hasMissingEnvironmentIds) return settings;
+
+        Prepare(settings);
+        if (string.IsNullOrWhiteSpace(settings.Id))
+        {
+            await db.Settings.InsertOneAsync(settings);
+        }
+        else
+        {
+            await db.Settings.ReplaceOneAsync(
+                Builders<AppSettingsDB>.Filter.Eq(item => item.Id, settings.Id),
+                settings);
+        }
+
+        return settings;
+    }
 
     public async Task<AppSettingsDB> SaveAsync(AppSettingsDB settings)
     {
@@ -41,12 +59,21 @@ public class SettingsLogic(MongoDbContext db)
         {
             foreach (var vps in settings.VpsEnvironments)
             {
+                if (string.IsNullOrWhiteSpace(vps.Id))
+                {
+                    vps.Id = Guid.CreateVersion7().ToString();
+                }
                 vps.Name = vps.Name?.Trim() ?? "Default";
                 vps.Host = vps.Host?.Trim() ?? string.Empty;
                 vps.Username = vps.Username?.Trim() ?? string.Empty;
                 vps.Password = vps.Password?.Trim() ?? string.Empty;
                 vps.EnvironmentTag = vps.EnvironmentTag?.Trim() ?? string.Empty;
                 vps.DefaultDeployBasePath = vps.DefaultDeployBasePath?.Trim() ?? string.Empty;
+                vps.ServerType = vps.ServerType?.Trim() ?? "Windows";
+                vps.DefaultDockerBasePath = vps.DefaultDockerBasePath?.Trim() ?? string.Empty;
+                vps.DockerRegistryUrl = vps.DockerRegistryUrl?.Trim() ?? string.Empty;
+                vps.DockerRegistryUsername = vps.DockerRegistryUsername?.Trim() ?? string.Empty;
+                vps.DockerRegistryPassword = vps.DockerRegistryPassword?.Trim() ?? string.Empty;
 
                 if (vps.SharedVariables != null)
                 {

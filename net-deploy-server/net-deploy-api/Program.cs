@@ -51,6 +51,7 @@ builder.Services.AddSingleton<TransferManager>();
 builder.Services.AddSingleton<DeployLogic>();
 
 builder.Services.AddSingleton<IISLogic>();
+builder.Services.AddSingleton<NET.Deploy.Api.Logic.Docker.DockerLogic>();
 
 var app = builder.Build();
 

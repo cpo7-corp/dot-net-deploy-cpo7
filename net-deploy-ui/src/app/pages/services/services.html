@@ -68,7 +68,13 @@
                   @for (s of group.services; track s.id) {
                     <tr>
                       <td class="ps-2 fw-bold text-white" style="cursor: pointer;" (click)="openEditModal(s)">{{s.name}}</td>
-                      <td><span class="badge bg-secondary opacity-75">{{s.serviceType}}</span></td>
+                      <td>
+                        @if (s.serviceType === 'Docker' || s.serviceType === 'DockerCompose') {
+                          <span class="badge bg-primary text-white"><i class="bi bi-box-seam me-1"></i>{{s.serviceType}}</span>
+                        } @else {
+                          <span class="badge bg-secondary opacity-75">{{s.serviceType}}</span>
+                        }
+                      </td>
                       <td>
                         @if (!s.lastDeployed) {
                           <span class="text-secondary small">{{ 'never' | translate }}</span>
@@ -175,22 +181,39 @@
                   <option value="WindowsService">{{ 'windowsService' | translate }}</option>
                   <option value="Angular">{{ 'angularSpa' | translate }}</option>
                   <option value="React">{{ 'reactSpa' | translate }}</option>
+                  <option value="Docker">{{ 'dockerfileWithNginx' | translate }}</option>
+                  <option value="DockerCompose">{{ 'dockerCompose' | translate }}</option>
                 </select>
               </div>
               <div class="col-12">
                 <label class="form-label text-secondary small">{{ 'gitRepoUrl' | translate }}</label>
                 <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newService.repoUrl" placeholder="https://github.com/user/repo">
               </div>
-              <div class="col-md-12">
-                <label class="form-label text-secondary small">{{ 'iisSiteName' | translate }}</label>
-                <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newService.iisSiteName" placeholder="MyService">
-                <div class="form-text text-secondary small mt-1">{{ 'iisSiteNameDescription' | translate }}</div>
-              </div>
-              <div class="col-md-12">
-                <label class="form-label text-secondary small">{{ 'projectPathOptional' | translate }}</label>
-                <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newService.projectPath" placeholder="src/MyApi/MyApi.csproj">
-                <div class="form-text text-secondary small mt-1">{{ 'projectPathDescription' | translate }}</div>
-              </div>
+              @if (newService.serviceType === 'Docker' || newService.serviceType === 'DockerCompose') {
+                <div class="col-md-6">
+                  <label class="form-label text-secondary small">{{ 'containerName' | translate }}</label>
+                  <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newService.dockerContainerName" placeholder="my-app-container">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label text-secondary small">{{ (newService.serviceType === 'DockerCompose' ? 'composeFilePath' : 'dockerfilePath') | translate }}</label>
+                  @if (newService.serviceType === 'DockerCompose') {
+                    <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newService.dockerComposePath" placeholder="docker-compose.yml">
+                  } @else {
+                    <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newService.dockerfilePath" placeholder="Dockerfile">
+                  }
+                </div>
+              } @else {
+                <div class="col-md-12">
+                  <label class="form-label text-secondary small">{{ 'iisSiteName' | translate }}</label>
+                  <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newService.iisSiteName" placeholder="MyService">
+                  <div class="form-text text-secondary small mt-1">{{ 'iisSiteNameDescription' | translate }}</div>
+                </div>
+                <div class="col-md-12">
+                  <label class="form-label text-secondary small">{{ 'projectPathOptional' | translate }}</label>
+                  <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="newService.projectPath" placeholder="src/MyApi/MyApi.csproj">
+                  <div class="form-text text-secondary small mt-1">{{ 'projectPathDescription' | translate }}</div>
+                </div>
+              }
               @if (newService.serviceType === 'WindowsService') {
                 <div class="col-md-12 mt-2">
                   <div class="form-check form-switch">
@@ -232,7 +255,7 @@
                   <div class="nav flex-column nav-pills gap-1">
                     <button class="nav-link text-start rounded-0 py-2 border-0"
                             [class.active]="activeEnvTab === 'general'"
-                            (click)="activeEnvTab = 'general'">
+                            (click)="selectEnvTab('general')">
                       <i class="bi bi-info-circle me-2"></i> {{ 'basicInfo' | translate }}
                     </button>
                   </div>
@@ -242,7 +265,7 @@
                     @for (env of allEnvironments(); track env.id) {
                       <button class="nav-link text-start rounded-0 py-2 border-0 d-flex justify-content-between align-items-center"
                               [class.active]="activeEnvTab === env.id"
-                              (click)="activeEnvTab = env.id">
+                              (click)="selectEnvTab(env.id)">
                         <span><i class="bi bi-cloud me-2"></i> {{env.name}}</span>
                         <i class="bi bi-chevron-right small opacity-50"></i>
                       </button>
@@ -271,20 +294,37 @@
                           <option value="WindowsService">{{ 'windowsService' | translate }}</option>
                           <option value="Angular">{{ 'angularSpa' | translate }}</option>
                           <option value="React">{{ 'reactSpa' | translate }}</option>
+                          <option value="Docker">{{ 'dockerfileWithNginx' | translate }}</option>
+                          <option value="DockerCompose">{{ 'dockerCompose' | translate }}</option>
                         </select>
                       </div>
                       <div class="col-12">
                         <label class="form-label text-secondary small">{{ 'gitRepoUrl' | translate }}</label>
                         <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.repoUrl">
                       </div>
-                      <div class="col-md-12">
-                        <label class="form-label text-secondary small">{{ 'iisSiteName' | translate }}</label>
-                        <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.iisSiteName">
-                      </div>
-                      <div class="col-md-12">
-                        <label class="form-label text-secondary small">{{ 'projectPath' | translate }}</label>
-                        <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.projectPath">
-                      </div>
+                      @if (selectedService.serviceType === 'Docker' || selectedService.serviceType === 'DockerCompose') {
+                        <div class="col-md-6">
+                          <label class="form-label text-secondary small">{{ 'containerName' | translate }}</label>
+                          <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.dockerContainerName" placeholder="my-app-container">
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label text-secondary small">{{ (selectedService.serviceType === 'DockerCompose' ? 'composeFilePath' : 'dockerfilePath') | translate }}</label>
+                          @if (selectedService.serviceType === 'DockerCompose') {
+                            <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.dockerComposePath" placeholder="docker-compose.yml">
+                          } @else {
+                            <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.dockerfilePath" placeholder="Dockerfile">
+                          }
+                        </div>
+                      } @else {
+                        <div class="col-md-12">
+                          <label class="form-label text-secondary small">{{ 'iisSiteName' | translate }}</label>
+                          <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.iisSiteName">
+                        </div>
+                        <div class="col-md-12">
+                          <label class="form-label text-secondary small">{{ 'projectPath' | translate }}</label>
+                          <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.projectPath">
+                        </div>
+                      }
                       @if (selectedService.serviceType === 'WindowsService') {
                         <div class="col-md-12 mt-3">
                           <div class="form-check form-switch">
@@ -297,80 +337,116 @@
                   </div>
                 }
 
-                @for (env of allEnvironments(); track env.id) {
-                  @if (activeEnvTab === env.id) {
-                    <div>
-                      <div class="d-flex justify-content-between align-items-center mb-4">
-                        <h5 class="mb-0">{{env.name}} {{ 'configuration' | translate }}</h5>
-                        @if (env.environmentTag) {
-                          <span class="badge bg-primary px-3 py-2">{{ 'tagPrefix' | translate }} {{env.environmentTag}}</span>
-                        }
-                      </div>
+                @if (activeEnvTab !== 'general') {
+                  @let envCfg = getEnvConfig(activeEnvTab!);
+                  <div>
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                      <h5 class="mb-0">{{ getEnvironmentName(activeEnvTab!) }} {{ 'configuration' | translate }}</h5>
+                      @if (getEnvironmentTag(activeEnvTab!)) {
+                        <span class="badge bg-primary px-3 py-2">{{ 'tagPrefix' | translate }} {{ getEnvironmentTag(activeEnvTab!) }}</span>
+                      }
+                    </div>
 
-                      <div class="card bg-dark-subtle border-secondary mb-4">
-                        <div class="card-body p-3">
-                          <div class="row g-3">
-                            <div class="col-md-12">
-                              <label class="form-label text-secondary small" [for]="'deployPath_' + env.id">{{ (selectedService.serviceType === 'WebApi' || selectedService.serviceType === 'Mvc' ? 'iisSitePathOptional' : 'deployTargetPathVps') | translate }}</label>
-                              <input type="text" class="form-control bg-dark text-white border-secondary"
-                                     [(ngModel)]="getEnvConfig(env.id!).deployTargetPath"
-                                     [id]="'deployPath_' + env.id" [name]="'deployPath_' + env.id" dir="ltr"
-                                     [attr.aria-describedby]="'deployPathHelp_' + env.id"
-                                     placeholder="C:\sites\my-app">
-                              @if (selectedService.serviceType === 'WebApi' || selectedService.serviceType === 'Mvc') {
-                                <div class="form-text text-secondary" [id]="'deployPathHelp_' + env.id">{{ 'iisSitePathHelp' | translate }}</div>
-                              }
-                            </div>
-                            @if (selectedService.serviceType === 'WebApi' || selectedService.serviceType === 'Mvc') {
-                              <div class="col-md-6">
-                                <label class="form-label text-secondary small" [for]="'iisPort_' + env.id">{{ 'iisPortOptional' | translate }}</label>
-                                <input type="number" class="form-control bg-dark text-white border-secondary"
-                                       [(ngModel)]="getEnvConfig(env.id!).iisPort" [id]="'iisPort_' + env.id"
-                                       [name]="'iisPort_' + env.id" min="1" max="65535" step="1" placeholder="80"
-                                       [attr.aria-describedby]="'iisPortHelp_' + env.id">
-                                <div class="form-text text-secondary" [id]="'iisPortHelp_' + env.id">{{ 'iisPortHelp' | translate }}</div>
-                              </div>
+                    <div class="card bg-dark-subtle border-secondary mb-4">
+                      <div class="card-body p-3">
+                        <div class="row g-3">
+                          <div class="col-md-12">
+                            <label class="form-label text-secondary small" [for]="'deployPath_' + activeEnvTab">{{ (isDockerEnvironment(activeEnvTab) ? 'dockerProjectPath' : selectedService.serviceType === 'WebApi' || selectedService.serviceType === 'Mvc' ? 'iisSitePathOptional' : 'deployTargetPathVps') | translate }}</label>
+                            <input type="text" class="form-control bg-dark text-white border-secondary"
+                                   [(ngModel)]="envCfg.deployTargetPath"
+                                   [id]="'deployPath_' + activeEnvTab" [name]="'deployPath_' + activeEnvTab" dir="ltr"
+                                   [attr.aria-describedby]="'deployPathHelp_' + activeEnvTab"
+                                   [placeholder]="isDockerEnvironment(activeEnvTab) ? '/srv/ev/backend' : 'C:\\sites\\my-app'">
+                            @if (isDockerEnvironment(activeEnvTab)) {
+                              <div class="form-text text-secondary" [id]="'deployPathHelp_' + activeEnvTab">{{ 'dockerProjectPathHelp' | translate }}</div>
+                            } @else if (selectedService.serviceType === 'WebApi' || selectedService.serviceType === 'Mvc') {
+                              <div class="form-text text-secondary" [id]="'deployPathHelp_' + activeEnvTab">{{ 'iisSitePathHelp' | translate }}</div>
                             }
+                          </div>
+                          @if (!isDockerEnvironment(activeEnvTab) && (selectedService.serviceType === 'WebApi' || selectedService.serviceType === 'Mvc')) {
                             <div class="col-md-6">
-                              <label class="form-label text-secondary small">{{ 'defaultBranch' | translate }}</label>
-                              <input type="text" class="form-control bg-dark text-white border-secondary"
-                                     [(ngModel)]="getEnvConfig(env.id!).defaultBranch"
-                                     placeholder="main">
+                              <label class="form-label text-secondary small" [for]="'iisPort_' + activeEnvTab">{{ 'iisPortOptional' | translate }}</label>
+                              <input type="number" class="form-control bg-dark text-white border-secondary"
+                                     [(ngModel)]="envCfg.iisPort" [id]="'iisPort_' + activeEnvTab"
+                                     [name]="'iisPort_' + activeEnvTab" min="1" max="65535" step="1" placeholder="80"
+                                     [attr.aria-describedby]="'iisPortHelp_' + activeEnvTab">
+                              <div class="form-text text-secondary" [id]="'iisPortHelp_' + activeEnvTab">{{ 'iisPortHelp' | translate }}</div>
                             </div>
-                            <div class="col-md-6">
-                              <label class="form-label text-secondary small">{{ 'heartbeatUrl' | translate }}</label>
-                              <input type="text" class="form-control bg-dark text-white border-secondary"
-                                     [(ngModel)]="getEnvConfig(env.id!).heartbeatUrl"
-                                     placeholder="https://prod.app.com/health">
+                          }
+                          @if (selectedService.serviceType === 'Docker' || isDockerEnvironment(activeEnvTab)) {
+                            <div class="col-md-4">
+                              <label class="form-label text-secondary small">{{ 'composeFilePath' | translate }}</label>
+                              <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.dockerComposePath" placeholder="docker-compose.yml">
                             </div>
+                            <div class="col-md-4">
+                              <label class="form-label text-secondary small">{{ 'composeServiceName' | translate }}</label>
+                              <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.dockerComposeServiceName" placeholder="machines.api">
+                            </div>
+                            <div class="col-md-4">
+                              <label class="form-label text-secondary small">{{ 'composeProjectName' | translate }}</label>
+                              <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.dockerComposeProjectName" placeholder="ev-backend">
+                            </div>
+                            <div class="col-md-12">
+                              <label class="form-label text-secondary small">{{ 'environmentComposeFile' | translate }}</label>
+                              <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="envCfg.dockerEnvironmentComposePath">
+                              <div class="form-text text-secondary">{{ 'environmentComposeFileHelp' | translate }}</div>
+                            </div>
+                            <div class="col-md-3">
+                              <label class="form-label text-secondary small">{{ 'dockerPort' | translate }}</label>
+                              <input type="number" class="form-control bg-dark text-white border-secondary" [(ngModel)]="envCfg.dockerPort" min="1" max="65535">
+                            </div>
+                            <div class="col-md-3">
+                              <label class="form-label text-secondary small">{{ 'dockerReplicas' | translate }}</label>
+                              <input type="number" class="form-control bg-dark text-white border-secondary" [(ngModel)]="envCfg.dockerReplicas" min="1">
+                            </div>
+                            <div class="col-md-3">
+                              <label class="form-label text-secondary small">{{ 'dockerParallelism' | translate }}</label>
+                              <input type="number" class="form-control bg-dark text-white border-secondary" [(ngModel)]="envCfg.dockerParallelism" min="1">
+                            </div>
+                            <div class="col-md-3">
+                              <label class="form-label text-secondary small">{{ 'dockerDrainSeconds' | translate }}</label>
+                              <input type="number" class="form-control bg-dark text-white border-secondary" [(ngModel)]="envCfg.dockerDrainSeconds" min="0">
+                            </div>
+                          }
+                          <div class="col-md-6">
+                            <label class="form-label text-secondary small" [for]="'defaultBranch_' + activeEnvTab">{{ 'defaultBranch' | translate }}</label>
+                            <input type="text" class="form-control bg-dark text-white border-secondary"
+                                   [(ngModel)]="envCfg.defaultBranch" [id]="'defaultBranch_' + activeEnvTab" [name]="'defaultBranch_' + activeEnvTab"
+                                   placeholder="main">
+                          </div>
+                          <div class="col-md-6">
+                            <label class="form-label text-secondary small" [for]="'heartbeatUrl_' + activeEnvTab">{{ 'heartbeatUrl' | translate }}</label>
+                            <input type="text" class="form-control bg-dark text-white border-secondary"
+                                   [(ngModel)]="envCfg.heartbeatUrl" [id]="'heartbeatUrl_' + activeEnvTab" [name]="'heartbeatUrl_' + activeEnvTab"
+                                   placeholder="https://prod.app.com/health">
                           </div>
                         </div>
                       </div>
+                    </div>
 
-                      <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                          <h6 class="text-secondary small text-uppercase mb-0">{{ 'variables' | translate }}</h6>
-                          <button class="btn btn-sm btn-outline-primary" (click)="openConfigLookup()">
-                            <i class="bi bi-plus-lg me-1"></i> {{ 'addVariables' | translate }}
-                          </button>
-                        </div>
+                    <div class="mb-4">
+                      <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h6 class="text-secondary small text-uppercase mb-0">{{ 'variables' | translate }}</h6>
+                        <button class="btn btn-sm btn-outline-primary" (click)="openConfigLookup()">
+                          <i class="bi bi-plus-lg me-1"></i> {{ 'addVariables' | translate }}
+                        </button>
+                      </div>
 
-                        <div class="d-flex flex-wrap gap-2">
-                          @for (set of getSelectedConfigSets(env.id!); track set.id) {
-                            <div class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 p-2 d-flex align-items-center gap-2">
-                              <span>{{set.name}}</span>
-                              <button class="btn btn-link text-primary p-0 lh-1" (click)="toggleConfigSet(env.id!, set.id!)">
-                                <i class="bi bi-x-circle-fill"></i>
-                              </button>
-                            </div>
-                          }
-                          @if (getSelectedConfigSets(env.id!).length === 0) {
-                            <div class="text-secondary small fst-italic">{{ 'noVariablesSelected' | translate }}</div>
-                          }
-                        </div>
+                      <div class="d-flex flex-wrap gap-2">
+                        @for (set of getSelectedConfigSets(activeEnvTab!); track set.id) {
+                          <div class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 p-2 d-flex align-items-center gap-2">
+                            <span>{{set.name}}</span>
+                            <button class="btn btn-link text-primary p-0 lh-1" (click)="toggleConfigSet(activeEnvTab!, set.id!)">
+                              <i class="bi bi-x-circle-fill"></i>
+                            </button>
+                          </div>
+                        }
+                        @if (getSelectedConfigSets(activeEnvTab!).length === 0) {
+                          <div class="text-secondary small fst-italic">{{ 'noVariablesSelected' | translate }}</div>
+                        }
                       </div>
                     </div>
-                  }
+                  </div>
                 }
               </div>
             </div>
@@ -412,10 +488,12 @@
             <div class="overflow-auto pe-1" style="max-height: 400px;">
               <div class="list-group list-group-flush border-0">
                 @for (set of filteredConfigSets(); track set.id) {
-                  <label class="list-group-item list-group-item-action bg-transparent border-secondary text-white small d-flex align-items-center gap-3 py-2 px-0"
-                         style="cursor: pointer">
-                    <input class="form-check-input mt-0 border-secondary ms-2" type="checkbox"
+                  <div class="list-group-item list-group-item-action bg-transparent border-secondary text-white small d-flex align-items-center gap-3 py-2 px-2 rounded"
+                       style="cursor: pointer"
+                       (click)="toggleConfigSet(activeEnvTab || '', set.id!)">
+                    <input class="form-check-input mt-0 border-secondary" type="checkbox"
                            [checked]="isConfigSetSelected(activeEnvTab || '', set.id!)"
+                           (click)="$event.stopPropagation()"
                            (change)="toggleConfigSet(activeEnvTab || '', set.id!)">
                     <div class="flex-grow-1">
                       <div class="fw-bold">{{set.name}}</div>
@@ -423,7 +501,7 @@
                         <div class="text-secondary smaller">{{set.sourceFileName}} -> {{set.targetFileName || 'appsettings.json'}}</div>
                       }
                     </div>
-                  </label>
+                  </div>
                 }
                 @if (filteredConfigSets().length === 0) {
                   <div class="text-center py-4 text-secondary small">{{ 'noMatchingResults' | translate }}</div>

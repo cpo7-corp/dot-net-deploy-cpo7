@@ -16,15 +16,22 @@ public class ServiceDefinitionDB
 
     public string RepoUrl { get; set; } = string.Empty;
 
-    /// <summary>Relative path to the .csproj inside the cloned repo</summary>
+    /// <summary>Relative path to the .csproj or dockerfile inside the cloned repo</summary>
     public string ProjectPath { get; set; } = string.Empty;
 
     public string IisSiteName { get; set; } = string.Empty;
 
-    /// <summary>WebApi | Mvc | Worker | Angular | React</summary>
+    /// <summary>WebApi | Mvc | Worker | Angular | React | Docker | DockerCompose</summary>
     public string ServiceType { get; set; } = "WebApi";
 
     public bool CompileSingleFile { get; set; } = false;
+
+    // Docker Specific Settings
+    public string? DockerfilePath { get; set; }
+    public string? DockerComposePath { get; set; }
+    public string? DockerContainerName { get; set; }
+    public string? DockerComposeServiceName { get; set; }
+    public string? DockerComposeProjectName { get; set; }
 
     public List<ServiceEnvironmentConfig> Environments { get; set; } = new();
 
@@ -39,6 +46,15 @@ public class ServiceEnvironmentConfig
     public string DeployTargetPath { get; set; } = string.Empty;
     [System.ComponentModel.DataAnnotations.Range(1, 65535)]
     public int? IisPort { get; set; }
+
+    // Docker Environment Settings
+    public int? DockerPort { get; set; }
+    public int DockerReplicas { get; set; } = 2;
+    public int DockerParallelism { get; set; } = 1;
+    public int DockerDrainSeconds { get; set; } = 10;
+    public bool EnableZeroDowntime { get; set; } = true;
+    public string? DockerEnvironmentComposePath { get; set; }
+
     public string HeartbeatUrl { get; set; } = string.Empty;
     public string DefaultBranch { get; set; } = "main";
 

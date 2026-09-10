@@ -45,7 +45,6 @@ export class SettingsComponent implements OnInit {
 
   addVpsEnvironment() {
     const newVps: VpsSettings = {
-      id: '',
       name: 'New Environment',
       host: '',
       username: '',
@@ -54,6 +53,12 @@ export class SettingsComponent implements OnInit {
       isLocal: false,
       environmentTag: '',
       defaultDeployBasePath: '',
+      serverType: 'Windows',
+      defaultDockerBasePath: '/opt/net-deploy',
+      useSudoDocker: false,
+      dockerRegistryUrl: '',
+      dockerRegistryUsername: '',
+      dockerRegistryPassword: '',
       sharedVariables: [],
       sharedFileRenames: []
     };
