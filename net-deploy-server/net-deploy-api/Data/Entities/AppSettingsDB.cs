@@ -32,9 +32,10 @@ public class VpsSettings
     public string EnvironmentTag { get; set; } = string.Empty;
     public string DefaultDeployBasePath { get; set; } = string.Empty;
 
-    // Docker Specific Environment Settings
-    /// <summary>Windows | LinuxDocker | WindowsDocker</summary>
+    // Docker & Linux Specific Environment Settings
+    /// <summary>Windows | Linux | LinuxDocker | WindowsDocker</summary>
     public string ServerType { get; set; } = "Windows";
+    public string DefaultLinuxBasePath { get; set; } = "/var/www";
     public string DefaultDockerBasePath { get; set; } = "/opt/net-deploy";
     public bool UseSudoDocker { get; set; } = false;
     public string DockerRegistryUrl { get; set; } = string.Empty;

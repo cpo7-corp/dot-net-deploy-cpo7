@@ -184,6 +184,7 @@
   "commits": "Commits",
   "environmentType": "Environment Type",
   "windowsIisServices": "Windows (IIS & Services)",
+  "linuxSystemdNginx": "Linux (systemd + Nginx)",
   "linuxDockerHost": "Linux (Docker Host)",
   "windowsDockerHost": "Windows (Docker Host)",
   "defaultDockerProjectPath": "Default Docker Project Path",

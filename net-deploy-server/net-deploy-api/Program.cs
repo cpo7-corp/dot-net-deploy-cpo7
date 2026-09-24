@@ -52,6 +52,7 @@ builder.Services.AddSingleton<DeployLogic>();
 
 builder.Services.AddSingleton<IISLogic>();
 builder.Services.AddSingleton<NET.Deploy.Api.Logic.Docker.DockerLogic>();
+builder.Services.AddSingleton<NET.Deploy.Api.Logic.Linux.LinuxLogic>();
 
 var app = builder.Build();
 

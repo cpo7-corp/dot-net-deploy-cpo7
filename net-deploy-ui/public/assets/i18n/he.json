@@ -182,6 +182,7 @@
   "commits": "Commits",
   "environmentType": "סוג סביבה",
   "windowsIisServices": "Windows (IIS ושירותים)",
+  "linuxSystemdNginx": "Linux (systemd + Nginx)",
   "linuxDockerHost": "Linux (שרת Docker)",
   "windowsDockerHost": "Windows (שרת Docker)",
   "defaultDockerProjectPath": "נתיב ברירת מחדל לפרויקט Docker",

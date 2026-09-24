@@ -15,7 +15,8 @@ NET Deploy is a powerful tool designed to automate the process of pulling, build
 - **Git Integration**: Pull and build from any Git repository.
 - **Multi-Service Deploy**: Deploy multiple services simultaneously.
 - **Framework Support**: Detailed support for .NET (WebAPI, Workers), Angular, React, and Node.js.
-- **IIS & Windows Services Support**: Automatic management of IIS sites and Windows Services.
+- **Windows & Linux Support**: Automatic management of Windows Services & IIS, plus native Linux support with **systemd** daemons & **Nginx** reverse proxy / static hosting.
+- **Cross-Platform Runners**: One-click startup scripts for both Windows (un-all.bat) and Linux (un-all.sh).
 - **Live Terminal Logs**: Real-time feedback during the deployment process.
 - **Heartbeat Monitoring**: Automatic health checks after deployment.
 - **Environment Variables Support**: Manage and update application settings during deployment.

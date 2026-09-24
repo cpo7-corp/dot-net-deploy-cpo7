@@ -97,6 +97,7 @@
                 <label class="form-label text-info small">{{ 'environmentType' | translate }}</label>
                 <select class="form-select bg-dark text-white border-secondary" [(ngModel)]="vps.serverType" [name]="'v_serverType_' + $index">
                   <option value="Windows">{{ 'windowsIisServices' | translate }}</option>
+                  <option value="Linux">{{ 'linuxSystemdNginx' | translate }}</option>
                   <option value="LinuxDocker">{{ 'linuxDockerHost' | translate }}</option>
                   <option value="WindowsDocker">{{ 'windowsDockerHost' | translate }}</option>
                 </select>
@@ -109,6 +110,11 @@
                          [(ngModel)]="vps.defaultDeployBasePath" [name]="'v_defaultPath_' + $index"
                          [id]="'v_defaultPath_' + $index" [attr.aria-describedby]="'v_defaultPathHelp_' + $index"
                          placeholder="C:\\inetpub\\wwwroot">
+                } @else if (vps.serverType === 'Linux') {
+                  <input type="text" class="form-control bg-dark text-white border-secondary" dir="ltr"
+                         [(ngModel)]="vps.defaultLinuxBasePath" [name]="'v_defaultPath_' + $index"
+                         [id]="'v_defaultPath_' + $index" [attr.aria-describedby]="'v_defaultPathHelp_' + $index"
+                         placeholder="/var/www">
                 } @else {
                   <input type="text" class="form-control bg-dark text-white border-secondary" dir="ltr"
                          [(ngModel)]="vps.defaultDockerBasePath" [name]="'v_defaultPath_' + $index"

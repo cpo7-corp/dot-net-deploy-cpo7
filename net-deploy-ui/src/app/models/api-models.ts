@@ -19,7 +19,8 @@ export interface VpsSettings {
   isLocal: boolean;
   environmentTag: string;
   defaultDeployBasePath?: string;
-  serverType?: 'Windows' | 'LinuxDocker' | 'WindowsDocker';
+  serverType?: 'Windows' | 'Linux' | 'LinuxDocker' | 'WindowsDocker';
+  defaultLinuxBasePath?: string;
   defaultDockerBasePath?: string;
   useSudoDocker?: boolean;
   dockerRegistryUrl?: string;

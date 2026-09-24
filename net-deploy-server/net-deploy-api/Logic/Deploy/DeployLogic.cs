@@ -17,7 +17,8 @@ public class DeployLogic(
     EnvConfigsLogic envConfigsLogic,
     NET.Deploy.Api.Logic.DeployHistory.DeployHistoryLogic deployHistoryLogic,
     ServicesLogic servicesLogic,
-    DockerLogic dockerLogic)
+    DockerLogic dockerLogic,
+    NET.Deploy.Api.Logic.Linux.LinuxLogic linuxLogic)
 {
     public (string RepoUrl, string Branch, string ProjectPath) ParseGitUrl(string fullUrl) => gitLogic.ParseGitUrl(fullUrl);
 
@@ -89,7 +90,8 @@ public class DeployLogic(
             }
 
             await log("INFO", $"🔨 [Prep] Building & publishing {service.Name}...", service.Id);
-            bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, service.Id, ct);
+            var isLinux = vps?.ServerType == "Linux";
+            bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, service.Id, ct, isLinux);
 
             if (buildSuccess)
             {
@@ -140,6 +142,12 @@ public class DeployLogic(
                 vps,
                 log,
                 service.Id);
+        }
+
+        if (vps?.ServerType == "Linux")
+        {
+            var serviceName = !string.IsNullOrWhiteSpace(service.IisSiteName) ? service.IisSiteName : service.Name;
+            return await linuxLogic.ManageServiceAsync(serviceName, action, vps, log, service.Id);
         }
 
         bool isWin = service.ServiceType == "WindowsService";
@@ -249,21 +257,36 @@ public class DeployLogic(
 
         var publishOutput = Path.Combine(Path.GetTempPath(), "net-deploy", service.Id ?? service.Name);
         var isWindowsService = service.ServiceType == "WindowsService";
-        var isIis = service.ServiceType is "WebApi" or "Mvc";
         var effectiveVps = vpsOverride ?? settings.VpsEnvironments.FirstOrDefault(e => e.Id == environmentId);
+        var isLinuxServer = effectiveVps?.ServerType == "Linux";
+        var isIis = !isLinuxServer && service.ServiceType is "WebApi" or "Mvc";
 
         if (IsDockerDeployment(service, effectiveVps))
         {
             return await DeployDockerServiceAsync(service, envConfig, effectiveVps, settings, log, branchOverride, forceClean, skipPull, skipHeartbeat, ct);
         }
 
-        var targetPath = isIis && !string.IsNullOrWhiteSpace(envConfig.DeployTargetPath)
-            ? IisDeployment.TargetPath(envConfig.DeployTargetPath, service.IisSiteName)
-            : envConfig.DeployTargetPath;
+        var targetPath = envConfig.DeployTargetPath;
+        if (isLinuxServer)
+        {
+            if (string.IsNullOrWhiteSpace(targetPath))
+            {
+                var baseFolder = !string.IsNullOrWhiteSpace(effectiveVps?.DefaultLinuxBasePath) ? effectiveVps.DefaultLinuxBasePath : "/var/www";
+                var folderName = !string.IsNullOrWhiteSpace(service.IisSiteName) ? service.IisSiteName : service.Name.ToLowerInvariant().Replace(" ", "-");
+                targetPath = $"{baseFolder.TrimEnd('/')}/{folderName}";
+            }
+        }
+        else if (isIis && !string.IsNullOrWhiteSpace(envConfig.DeployTargetPath))
+        {
+            targetPath = IisDeployment.TargetPath(envConfig.DeployTargetPath, service.IisSiteName);
+        }
 
         // PHASE 1: PREPARATION (Pull, Build, Config)
         bool prepSuccess = await PrepAndBuildServiceAsync(service, settings, log, environmentId, branchOverride, forceClean, skipPull, skipBuildIfOutputExists, ct);
         if (!prepSuccess) return (false, null, 0, 0);
+
+        if (isLinuxServer && effectiveVps != null && !await linuxLogic.PrepareDeployDirectoryAsync(targetPath, effectiveVps, log, serviceId))
+            return (false, null, 0, 0);
 
         // NEW: Get current commit info
         ProjectVersion? currentVersion = null;
@@ -278,13 +301,21 @@ public class DeployLogic(
         catch { }
 
         // PHASE 2: STOP (Site/Service)
-        if (isIis)
-            targetPath = (await IisDeployment.RunAsync(service.IisSiteName, "ensure", targetPath, effectiveVps, processRunner, log, serviceId, envConfig.IisPort))!;
+        if (isLinuxServer && effectiveVps != null)
+        {
+            var sName = !string.IsNullOrWhiteSpace(service.IisSiteName) ? service.IisSiteName : service.Name;
+            await linuxLogic.ManageServiceAsync(sName, "stop", effectiveVps, log, serviceId);
+        }
+        else
+        {
+            if (isIis)
+                targetPath = (await IisDeployment.RunAsync(service.IisSiteName, "ensure", targetPath, effectiveVps, processRunner, log, serviceId, envConfig.IisPort))!;
 
-        if (isWindowsService)
-            await ManageWindowsServiceAsync(service.IisSiteName, "stop", log, serviceId);
-        else if (service.ServiceType is "WebApi" or "Mvc")
-            await ManageIisSiteAsync(service.IisSiteName, "stop", log, serviceId, effectiveVps);
+            if (isWindowsService)
+                await ManageWindowsServiceAsync(service.IisSiteName, "stop", log, serviceId);
+            else if (service.ServiceType is "WebApi" or "Mvc")
+                await ManageIisSiteAsync(service.IisSiteName, "stop", log, serviceId, effectiveVps);
+        }
 
         // EXTRA: Force kill any remaining processes holding files in target directory
         if (effectiveVps == null || effectiveVps.IsLocal || string.IsNullOrWhiteSpace(effectiveVps.Host) || effectiveVps.Host is "localhost" or "127.0.0.1")
@@ -296,7 +327,12 @@ public class DeployLogic(
         if (!result.Success)
         {
             // Restore service if transfer failed
-            if (isWindowsService)
+            if (isLinuxServer && effectiveVps != null)
+            {
+                var sName = !string.IsNullOrWhiteSpace(service.IisSiteName) ? service.IisSiteName : service.Name;
+                await linuxLogic.ManageServiceAsync(sName, "start", effectiveVps, log, serviceId);
+            }
+            else if (isWindowsService)
                 await ManageWindowsServiceAsync(service.IisSiteName, "start", log, serviceId, envConfig.DeployTargetPath);
             else if (service.ServiceType is "WebApi" or "Mvc")
                 await ManageIisSiteAsync(service.IisSiteName, "start", log, serviceId, effectiveVps);
@@ -593,7 +629,13 @@ public class DeployLogic(
         catch (Exception ex)
         {
             await log("WARNING", $"🔄 Transfer failed. Attempting to restart service/site to restore availability...", service.Id);
-            if (isWindowsService)
+            var isLinuxServerCatch = vpsOverride?.ServerType == "Linux";
+            if (isLinuxServerCatch && vpsOverride != null)
+            {
+                var sName = !string.IsNullOrWhiteSpace(service.IisSiteName) ? service.IisSiteName : service.Name;
+                await linuxLogic.ManageServiceAsync(sName, "start", vpsOverride, log, service.Id);
+            }
+            else if (isWindowsService)
                 await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id, targetPath);
             else if (service.ServiceType is "WebApi" or "Mvc")
                 await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id, vpsOverride);
@@ -605,7 +647,28 @@ public class DeployLogic(
 
         var transferDuration = (DateTime.UtcNow - transferStart).TotalSeconds;
 
-        if (isWindowsService)
+        var isLinuxServer = vpsOverride?.ServerType == "Linux";
+        if (isLinuxServer && vpsOverride != null)
+        {
+            var sName = !string.IsNullOrWhiteSpace(service.IisSiteName) ? service.IisSiteName : service.Name;
+            var internalPort = envConfig.IisPort ?? 5000;
+
+            if (service.ServiceType is not ("Angular" or "React"))
+            {
+                if (!await linuxLogic.EnsureSystemdServiceAsync(sName, targetPath, service.ServiceType, vpsOverride, log, service.Id, internalPort))
+                    return (false, null, transferDuration, 0);
+
+                if (!await linuxLogic.ManageServiceAsync(sName, "restart", vpsOverride, log, service.Id))
+                    return (false, null, transferDuration, 0);
+            }
+
+            if (service.ServiceType is "WebApi" or "Mvc" or "Angular" or "React")
+            {
+                if (!await linuxLogic.ConfigureNginxAsync(sName, service.ServiceType, targetPath, internalPort, null, vpsOverride, log, service.Id))
+                    return (false, null, transferDuration, 0);
+            }
+        }
+        else if (isWindowsService)
             await ManageWindowsServiceAsync(service.IisSiteName, "start", log, service.Id, targetPath);
         else if (service.ServiceType is "WebApi" or "Mvc")
             await ManageIisSiteAsync(service.IisSiteName, "start", log, service.Id, vpsOverride);

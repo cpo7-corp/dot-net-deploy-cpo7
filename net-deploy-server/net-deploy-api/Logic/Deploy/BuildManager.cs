@@ -2,13 +2,13 @@ namespace NET.Deploy.Api.Logic.Deploy;
 
 public class BuildManager(ProcessRunner processRunner)
 {
-    public async Task<bool> BuildAsync(string projectPath, string outputPath, string serviceType, bool compileSingleFile, LogCallback log, string? serviceId, System.Threading.CancellationToken ct = default)
+    public async Task<bool> BuildAsync(string projectPath, string outputPath, string serviceType, bool compileSingleFile, LogCallback log, string? serviceId, System.Threading.CancellationToken ct = default, bool isLinuxTarget = false)
     {
         var isNode = serviceType is "Angular" or "React" || projectPath.EndsWith("package.json");
 
         return isNode 
             ? await RunNpmBuildAsync(projectPath, outputPath, log, serviceId, serviceType, ct)
-            : await RunDotnetPublishAsync(projectPath, outputPath, compileSingleFile, log, serviceId, ct);
+            : await RunDotnetPublishAsync(projectPath, outputPath, compileSingleFile, log, serviceId, ct, isLinuxTarget);
     }
 
     private async Task<bool> RunNpmBuildAsync(string projectPath, string outputPath, LogCallback log, string? serviceId, string serviceType, System.Threading.CancellationToken ct)
@@ -68,7 +68,7 @@ public class BuildManager(ProcessRunner processRunner)
         return false;
     }
 
-    private async Task<bool> RunDotnetPublishAsync(string projectPath, string outputPath, bool compileSingleFile, LogCallback log, string? serviceId, System.Threading.CancellationToken ct)
+    private async Task<bool> RunDotnetPublishAsync(string projectPath, string outputPath, bool compileSingleFile, LogCallback log, string? serviceId, System.Threading.CancellationToken ct, bool isLinuxTarget = false)
     {
         var projectDir = Directory.Exists(projectPath) ? projectPath : Path.GetDirectoryName(projectPath)!;
         var dotnet = ExeResolver.Resolve("dotnet");
@@ -76,7 +76,8 @@ public class BuildManager(ProcessRunner processRunner)
 
         if (compileSingleFile)
         {
-            args += " -p:PublishSingleFile=true -r win-x64 --self-contained true";
+            var runtimeIdentifier = isLinuxTarget ? "linux-x64" : "win-x64";
+            args += $" -p:PublishSingleFile=true -r {runtimeIdentifier} --self-contained true";
         }
         
         // Ensure NuGet can resolve packages even when running under IIS AppPool Identity (where APPDATA is empty)

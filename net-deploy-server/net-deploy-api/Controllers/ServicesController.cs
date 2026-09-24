@@ -10,7 +10,7 @@ namespace NET.Deploy.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, NET.Deploy.Api.Logic.Docker.DockerLogic dockerLogic, SettingsLogic settingsLogic, ILogger<ServicesController> logger) : ControllerBase
+public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, NET.Deploy.Api.Logic.Docker.DockerLogic dockerLogic, NET.Deploy.Api.Logic.Linux.LinuxLogic linuxLogic, SettingsLogic settingsLogic, ILogger<ServicesController> logger) : ControllerBase
 {
     /// <summary>Returns all services with their live IIS / Docker status.</summary>
     [HttpGet]
@@ -31,6 +31,11 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
                         ? s.DockerContainerName
                         : (!string.IsNullOrWhiteSpace(s.IisSiteName) ? s.IisSiteName : s.Name.ToLowerInvariant().Replace(" ", "-"));
                     status = await dockerLogic.GetStatusAsync(containerName, vps);
+                }
+                else if (vps?.ServerType == "Linux")
+                {
+                    var serviceName = !string.IsNullOrWhiteSpace(s.IisSiteName) ? s.IisSiteName : s.Name;
+                    status = await linuxLogic.GetServiceStatusAsync(serviceName, vps);
                 }
                 else
                 {
