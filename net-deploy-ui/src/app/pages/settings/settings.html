@@ -238,10 +238,50 @@
               <div class="p-4 border border-secondary rounded bg-black bg-opacity-25 h-100">
                 <h5><i class="bi bi-upload me-2 text-danger"></i> {{ 'importData' | translate }}</h5>
                 <p class="small text-secondary">{{ 'importDesc' | translate }}</p>
-                <label class="btn btn-outline-danger mt-2">
-                  <i class="bi bi-file-earmark-arrow-up me-2"></i> {{ 'importFromFile' | translate }}
-                  <input type="file" (change)="onImportDb($event)" accept=".json" hidden>
-                </label>
+                <!-- Direct visible file input (100% works on Linux / Snap / Flatpak / GTK) -->
+                <div class="mt-2 mb-3">
+                  <label class="form-label small text-secondary mb-1">Select JSON File:</label>
+                  <input type="file" class="form-control form-control-sm bg-dark text-white border-secondary" (change)="onImportDb($event)" (input)="onImportDb($event)" accept=".json,application/json,text/plain">
+                </div>
+
+                <!-- Direct Paste JSON alternative -->
+                <div class="mt-3 border-top border-secondary pt-2">
+                  <label class="form-label small text-secondary mb-1">Or paste JSON content directly:</label>
+                  <textarea class="form-control form-control-sm bg-dark text-white border-secondary font-monospace" rows="3" [(ngModel)]="pasteJsonText" [ngModelOptions]="{standalone: true}" placeholder="Paste exported JSON here..."></textarea>
+                  <button type="button" class="btn btn-outline-danger btn-sm mt-2" (click)="importFromPaste()" [disabled]="!pasteJsonText.trim()">
+                    <i class="bi bi-clipboard-check me-1"></i> Load Pasted JSON
+                  </button>
+                </div>
+
+                <!-- Live status / message -->
+                @if (importStatus()) {
+                  <div class="alert alert-info mt-3 py-2 small">
+                    <i class="bi bi-info-circle me-1"></i> {{ importStatus() }}
+                  </div>
+                }
+
+                <!-- File Ready Confirmation Box -->
+                @if (selectedFile()) {
+                  <div class="card bg-danger bg-opacity-10 border border-danger p-3 mt-3">
+                    <div class="fw-bold text-danger mb-1">
+                      <i class="bi bi-file-earmark-check me-2"></i>File Ready to Import:
+                    </div>
+                    <div class="small text-light mb-2">
+                      <strong>{{ selectedFile()?.name }}</strong> ({{ selectedFile()?.size }} bytes)
+                    </div>
+                    <div class="small text-warning mb-3">
+                      Warning: Importing will overwrite all existing database settings and services!
+                    </div>
+                    <div class="d-flex gap-2">
+                      <button type="button" class="btn btn-danger btn-sm px-3 fw-bold" (click)="doImport()">
+                        <i class="bi bi-check-circle me-1"></i> Restore Database Now
+                      </button>
+                      <button type="button" class="btn btn-secondary btn-sm px-3" (click)="cancelImport()">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                }
               </div>
             </div>
           </div>

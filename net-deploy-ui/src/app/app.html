@@ -4,7 +4,10 @@
     <div class="logo-area mb-4 px-2 d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-2">
         <div class="logo-icon bg-primary rounded d-flex justify-content-center align-items-center">∞</div>
-        <h2 class="fs-5 fw-bold mb-0 text-truncate">{{ 'appTitle' | translate }}</h2>
+        <div>
+          <h2 class="fs-5 fw-bold mb-0 text-truncate">{{ 'appTitle' | translate }}</h2>
+          <span class="badge bg-primary text-white" style="font-size: 0.7rem; letter-spacing: 0.5px;">v{{ appVersion }}</span>
+        </div>
       </div>
       <button class="btn btn-sm btn-link text-warning p-0 border-0" (click)="showLicenseNotice()" title="Commercial use notice">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>
@@ -67,6 +70,9 @@
         <option value="uk">Українська</option>
         <option value="ro">Română</option>
       </select>
+      <div class="text-secondary small mt-3 px-1 text-center" style="font-size: 0.72rem; opacity: 0.7;">
+        v{{ appVersion }} &bull; {{ buildTimestamp }}
+      </div>
     </div>
   </aside>
 

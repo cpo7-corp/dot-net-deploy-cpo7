@@ -60,6 +60,11 @@ public class TransferManager
         return false;
     }
 
+    private static readonly HashSet<string> IgnoredDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".git", ".vs", ".idea", "bin", "obj", ".angular"
+    };
+
     private async Task UploadDirectoryToRemoteAsync(string localPath, string remotePath, VpsSettings vps, LogCallback log, string? serviceId, System.Threading.CancellationToken ct)
     {
         await log("INFO", $"[SFTP] Attempting connect to Host: '{vps.Host}', Username: '{vps.Username}'", serviceId);
@@ -87,25 +92,64 @@ public class TransferManager
             client.ConnectionInfo.Timeout = TimeSpan.FromSeconds(20);
             
             client.Connect();
-            
-            var root = remotePath.Replace("\\", "/");
-            async Task UploadSf(string localDir, string remoteDir)
+            await log("INFO", $"🔌 [SFTP] Connected successfully to '{vps.Host}'. Scanning files...", serviceId);
+
+            var root = remotePath.Replace("\\", "/").TrimEnd('/');
+            var createdRemoteDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var allFiles = new List<FileInfo>();
+            void ScanFiles(string currentDir)
             {
-                if (!client.Exists(remoteDir)) EnsureRemoteDirectory(client, remoteDir);
-                foreach (var file in Directory.GetFiles(localDir))
+                var dirInfo = new DirectoryInfo(currentDir);
+                foreach (var file in dirInfo.GetFiles())
                 {
-                    using var fs = File.OpenRead(file);
-                    client.UploadFile(fs, remoteDir + "/" + Path.GetFileName(file));
+                    allFiles.Add(file);
                 }
-                foreach (var subDir in Directory.GetDirectories(localDir))
+                foreach (var subDir in dirInfo.GetDirectories())
                 {
-                    ct.ThrowIfCancellationRequested();
-                    await UploadSf(subDir, remoteDir + "/" + Path.GetFileName(subDir));
+                    if (IgnoredDirectoryNames.Contains(subDir.Name)) continue;
+                    ScanFiles(subDir.FullName);
                 }
             }
 
-            await UploadSf(localPath, root);
+            ScanFiles(localPath);
+            var totalFiles = allFiles.Count;
+            var totalBytes = allFiles.Sum(f => f.Length);
+            await log("INFO", $"📦 [SFTP] Found {totalFiles} files ({totalBytes / (1024.0 * 1024.0):F1} MB). Starting transfer...", serviceId);
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var lastLogSw = System.Diagnostics.Stopwatch.StartNew();
+            var uploadedFiles = 0;
+
+            EnsureRemoteDirectory(client, root);
+            createdRemoteDirs.Add(root);
+
+            foreach (var file in allFiles)
+            {
+                ct.ThrowIfCancellationRequested();
+                var relativePath = Path.GetRelativePath(localPath, file.FullName).Replace('\\', '/');
+                var remoteFilePath = $"{root}/{relativePath}";
+                var remoteDir = Path.GetDirectoryName(remoteFilePath)?.Replace('\\', '/');
+
+                if (!string.IsNullOrEmpty(remoteDir) && createdRemoteDirs.Add(remoteDir))
+                {
+                    EnsureRemoteDirectory(client, remoteDir);
+                }
+
+                using var fs = file.OpenRead();
+                client.UploadFile(fs, remoteFilePath);
+                uploadedFiles++;
+
+                if (lastLogSw.ElapsedMilliseconds > 2000 || uploadedFiles == totalFiles)
+                {
+                    var percent = totalFiles > 0 ? (int)((double)uploadedFiles / totalFiles * 100) : 100;
+                    await log("INFO", $"📤 [SFTP] Uploading files: {uploadedFiles}/{totalFiles} ({percent}%)...", serviceId);
+                    lastLogSw.Restart();
+                }
+            }
+
             client.Disconnect();
+            await log("SUCCESS", $"✅ [SFTP] Transfer completed: {totalFiles} files in {sw.Elapsed.TotalSeconds:F1}s.", serviceId);
             return;
         }
         catch (Exception ex)

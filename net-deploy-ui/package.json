@@ -6,6 +6,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --port 5432",
+    "prebuild": "node scripts/bump-version.js",
     "build": "ng build",
     "prod": "ng build --configuration production",
     "build:docker": "ng build --configuration docker",

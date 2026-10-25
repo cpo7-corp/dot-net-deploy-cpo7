@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectorRef, Component, inject, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { TranslateModule } from '@ngx-translate/core';
@@ -16,6 +16,7 @@ import { MaintenanceService } from '../../services/maintenance.service';
 export class SettingsComponent implements OnInit {
   private settingsSvc = inject(SettingsService);
   private maintenanceSvc = inject(MaintenanceService);
+  private cdr = inject(ChangeDetectorRef);
 
   activeTab = signal<'git' | 'vps' | 'database'>('git');
   settings = signal<AppSettings>({
@@ -26,6 +27,11 @@ export class SettingsComponent implements OnInit {
   showLoading = signal<boolean>(true);
   saving = signal<boolean>(false);
   successMsg = signal<string>('');
+
+  // Import state
+  selectedFile = signal<{ name: string; size: number; data: any } | null>(null);
+  importStatus = signal<string>('');
+  pasteJsonText = '';
 
   ngOnInit() {
     this.settingsSvc.getSettings().subscribe({
@@ -119,30 +125,78 @@ export class SettingsComponent implements OnInit {
     });
   }
 
-  onImportDb(event: any) {
-    const file = event.target.files[0];
+  async onImportDb(event: any) {
+    const input = event.target as HTMLInputElement;
+    const file = input?.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e: any) => {
-      try {
-        const data = JSON.parse(e.target.result);
-        if (confirm('Are you sure? This will replace ALL existing settings, services and environment configurations!')) {
-          this.maintenanceSvc.importDatabase(data).subscribe({
-            next: () => {
-              alert('Imported successfully! The page will now reload.');
-              window.location.reload();
-            },
-            error: (err) => {
-              alert('Import failed: ' + (err.error?.message || err.message));
-            }
-          });
-        }
-      } catch (err) {
-        alert('Invalid JSON file.');
+    this.importStatus.set('Reading file: ' + file.name + ' (' + file.size + ' bytes)...');
+    this.cdr.detectChanges();
+
+    try {
+      const text = await file.text();
+      const cleanText = text.replace(/^\uFEFF/, '').trim();
+      const data = JSON.parse(cleanText);
+
+      this.selectedFile.set({
+        name: file.name,
+        size: file.size,
+        data: data
+      });
+      this.importStatus.set('');
+      this.cdr.detectChanges();
+    } catch (err: any) {
+      this.importStatus.set('Error reading file: ' + (err?.message || 'Invalid JSON'));
+      this.selectedFile.set(null);
+      this.cdr.detectChanges();
+    } finally {
+      if (input) input.value = '';
+    }
+  }
+
+  doImport() {
+    const item = this.selectedFile();
+    if (!item?.data) return;
+
+    this.importStatus.set('Importing into database...');
+    this.cdr.detectChanges();
+
+    this.maintenanceSvc.importDatabase(item.data).subscribe({
+      next: () => {
+        this.importStatus.set('Imported successfully! Reloading...');
+        this.selectedFile.set(null);
+        this.cdr.detectChanges();
+        setTimeout(() => window.location.reload(), 1200);
+      },
+      error: (err) => {
+        this.importStatus.set('Import failed: ' + (err.error?.message || err.message));
+        this.cdr.detectChanges();
       }
-    };
-    reader.readAsText(file);
-    event.target.value = ''; // Reset input
+    });
+  }
+
+  importFromPaste() {
+    if (!this.pasteJsonText.trim()) return;
+    try {
+      const cleanText = this.pasteJsonText.replace(/^\uFEFF/, '').trim();
+      const data = JSON.parse(cleanText);
+      this.selectedFile.set({
+        name: 'Pasted JSON Data',
+        size: cleanText.length,
+        data: data
+      });
+      this.importStatus.set('');
+      this.cdr.detectChanges();
+    } catch (err: any) {
+      this.importStatus.set('Error parsing pasted JSON: ' + (err?.message || 'Invalid JSON format'));
+      this.selectedFile.set(null);
+      this.cdr.detectChanges();
+    }
+  }
+
+  cancelImport() {
+    this.selectedFile.set(null);
+    this.importStatus.set('');
+    this.cdr.detectChanges();
   }
 }

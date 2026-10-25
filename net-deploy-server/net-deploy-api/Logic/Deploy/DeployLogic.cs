@@ -125,7 +125,7 @@ public class DeployLogic(
             var composeFile = GetDockerComposeFile(service);
             var targetPath = GetDockerTargetPath(service, envConfig, vps);
             var environmentComposeFile = GetDockerEnvironmentComposeFile(envConfig);
-            var composeServiceName = service.DockerComposeServiceName;
+            var composeServiceName = GetDockerComposeServiceName(service);
             if (string.IsNullOrWhiteSpace(composeServiceName))
             {
                 await log("ERROR", "❌ [Docker] Compose Service Name is required for a single-service action.", service.Id);
@@ -400,7 +400,7 @@ public class DeployLogic(
             var composeFile = GetDockerComposeFile(service);
             var composeFullPath = Path.Combine(repoLocalPath, composeFile);
             var usesExistingCompose = File.Exists(composeFullPath);
-            var composeServiceName = service.DockerComposeServiceName;
+            var composeServiceName = GetDockerComposeServiceName(service);
             var environmentComposeFile = GetDockerEnvironmentComposeFile(envConfig);
             string? overrideFile = null;
 
@@ -557,6 +557,16 @@ public class DeployLogic(
         !string.IsNullOrWhiteSpace(service.DockerComposePath)
             ? service.DockerComposePath
             : "docker-compose.yml";
+
+    private static string GetDockerComposeServiceName(ServiceDefinitionDB service)
+    {
+        if (!string.IsNullOrWhiteSpace(service.DockerComposeServiceName))
+            return service.DockerComposeServiceName.Trim();
+
+        return !string.IsNullOrWhiteSpace(service.Name)
+            ? service.Name.Trim().Replace(" ", "-")
+            : string.Empty;
+    }
 
     private static string? GetDockerEnvironmentComposeFile(ServiceEnvironmentConfig envConfig) =>
         envConfig.DockerEnvironmentComposePath;

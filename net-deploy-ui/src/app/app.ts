@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { APP_VERSION, BUILD_TIMESTAMP } from '../environments/version';
 
 @Component({
   selector: 'app-root',
@@ -10,6 +11,8 @@ import { TranslateModule, TranslateService } from '@ngx-translate/core';
 })
 export class App {
   title = 'Deploy.NET';
+  appVersion = APP_VERSION;
+  buildTimestamp = BUILD_TIMESTAMP;
   private translate = inject(TranslateService);
 
   constructor() {

@@ -380,7 +380,7 @@
                             </div>
                             <div class="col-md-4">
                               <label class="form-label text-secondary small">{{ 'composeServiceName' | translate }}</label>
-                              <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.dockerComposeServiceName" placeholder="machines.api">
+                              <input type="text" class="form-control bg-dark text-white border-secondary" [(ngModel)]="selectedService.dockerComposeServiceName" [placeholder]="selectedService.name || 'machines-api'">
                             </div>
                             <div class="col-md-4">
                               <label class="form-label text-secondary small">{{ 'composeProjectName' | translate }}</label>
