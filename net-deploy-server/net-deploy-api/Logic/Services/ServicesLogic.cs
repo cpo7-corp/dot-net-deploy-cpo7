@@ -7,7 +7,7 @@ namespace NET.Deploy.Api.Logic.Services;
 public class ServicesLogic(MongoDbContext db)
 {
     public async Task<List<ServiceDefinitionDB>> GetAllAsync() =>
-        await db.Services.Find(_ => true).SortBy(s => s.Order).ToListAsync();
+        await db.Services.Find(_ => true).SortBy(s => s.Order).ThenBy(s => s.Name).ToListAsync();
 
     public async Task<ServiceDefinitionDB?> GetByIdAsync(string id) =>
         await db.Services.Find(s => s.Id == id).FirstOrDefaultAsync();
@@ -16,6 +16,11 @@ public class ServicesLogic(MongoDbContext db)
     {
         Prepare(service);
         service.Id = null; // MongoDB generates the ID
+        if (service.Order == 0)
+        {
+            var maxOrder = await db.Services.Find(_ => true).SortByDescending(s => s.Order).Limit(1).Project(s => s.Order).FirstOrDefaultAsync();
+            service.Order = maxOrder + 1;
+        }
         await db.Services.InsertOneAsync(service);
         return service;
     }

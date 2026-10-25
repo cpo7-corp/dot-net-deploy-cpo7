@@ -7,6 +7,19 @@ namespace NET.Deploy.Api.Logic.Git;
 
 public class GitLogic(ILogger<GitLogic> logger)
 {
+    public static string GetEffectiveBaseDir(GitSettings git)
+    {
+        var dir = git?.LocalBaseDir?.Trim();
+        if (!OperatingSystem.IsWindows())
+        {
+            if (string.IsNullOrWhiteSpace(dir) || (dir.Length >= 2 && dir[1] == ':') || dir.StartsWith("\\"))
+            {
+                return Path.Combine(Path.GetTempPath(), "deploy-temp");
+            }
+        }
+        return string.IsNullOrWhiteSpace(dir) ? @"C:\deploy-temp" : dir;
+    }
+
     private static int isCleaningUp;
 
     /// <summary>
@@ -15,7 +28,7 @@ public class GitLogic(ILogger<GitLogic> logger)
     public async Task<bool> PullAsync(GitSettings git, string repoUrl, string branch, Deploy.LogCallback? log = null, string? sparsePath = null, bool forceClean = false, System.Threading.CancellationToken ct = default)
     {
         var repoDirName = GetSafeRepoName(repoUrl);
-        var repoPath = Path.Combine(git.LocalBaseDir, repoDirName);
+        var repoPath = Path.Combine(GetEffectiveBaseDir(git), repoDirName);
 
         var @lock = RepositoryLockManager.Get(repoPath);
         await @lock.WaitAsync(ct);
@@ -23,9 +36,9 @@ public class GitLogic(ILogger<GitLogic> logger)
         try
         {
             // Ensure base directory exists
-            Directory.CreateDirectory(git.LocalBaseDir);
+            Directory.CreateDirectory(GetEffectiveBaseDir(git));
 
-            CleanupStaleDeletedDirectories(git.LocalBaseDir);
+            CleanupStaleDeletedDirectories(GetEffectiveBaseDir(git));
 
             var authUrl = BuildAuthUrl(git, repoUrl);
 
@@ -161,7 +174,7 @@ public class GitLogic(ILogger<GitLogic> logger)
 
     public string GetRepoLocalPath(GitSettings git, string repoUrl, string? sparsePath = null)
     {
-        return Path.Combine(git.LocalBaseDir, GetSafeRepoName(repoUrl));
+        return Path.Combine(GetEffectiveBaseDir(git), GetSafeRepoName(repoUrl));
     }
 
     private string GetSafeRepoName(string repoUrl)
@@ -370,3 +383,4 @@ public class GitLogic(ILogger<GitLogic> logger)
         return true;
     }
 }
+
