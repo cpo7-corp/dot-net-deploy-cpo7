@@ -61,6 +61,7 @@ public class ServicesController(ServicesLogic servicesLogic, IISLogic iisLogic, 
                 DockerComposeServiceName = s.DockerComposeServiceName,
                 DockerComposeProjectName = s.DockerComposeProjectName,
                 Environments = s.Environments,
+                Order = s.Order,
                 Status = status
             };
         }));

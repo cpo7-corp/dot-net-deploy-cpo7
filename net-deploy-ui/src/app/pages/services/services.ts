@@ -54,16 +54,28 @@ export class ServicesComponent implements OnInit {
     }
 
     return Array.from(groups.entries())
-      .sort(([left], [right]) => {
-        if (left === '__ungrouped__') return 1;
-        if (right === '__ungrouped__') return -1;
-        return left.localeCompare(right);
-      })
       .map(([key, services]) => ({
         key,
         title: key === '__ungrouped__' ? 'Ungrouped' : key,
-        services
-      }));
+        services: [...services].sort((a, b) => {
+          const leftOrder = a.order ?? Number.MAX_SAFE_INTEGER;
+          const rightOrder = b.order ?? Number.MAX_SAFE_INTEGER;
+          if (leftOrder !== rightOrder) {
+            return leftOrder - rightOrder;
+          }
+          return a.name.localeCompare(b.name);
+        })
+      }))
+      .sort((left, right) => {
+        if (left.key === '__ungrouped__') return 1;
+        if (right.key === '__ungrouped__') return -1;
+        const leftOrder = left.services[0]?.order ?? Number.MAX_SAFE_INTEGER;
+        const rightOrder = right.services[0]?.order ?? Number.MAX_SAFE_INTEGER;
+        if (leftOrder !== rightOrder) {
+          return leftOrder - rightOrder;
+        }
+        return left.title.localeCompare(right.title);
+      });
   });
 
   collapsedGroups = signal<Set<string>>(new Set());
