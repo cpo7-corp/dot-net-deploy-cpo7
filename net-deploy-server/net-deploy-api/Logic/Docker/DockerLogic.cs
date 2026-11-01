@@ -143,7 +143,7 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
         var composeAction = action switch
         {
             "build" => "build",
-            "deploy" => "up -d --build --no-deps",
+            "deploy" => "up -d --no-deps",
             "start" => "start",
             "stop" => "stop",
             "restart" => "restart",

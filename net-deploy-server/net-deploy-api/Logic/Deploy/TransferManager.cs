@@ -62,7 +62,7 @@ public class TransferManager
 
     private static readonly HashSet<string> IgnoredDirectoryNames = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".git", ".vs", ".idea", "bin", "obj", ".angular"
+        ".git", ".vs", ".idea", "bin", "obj", ".angular", "node_modules", ".vscode"
     };
 
     private async Task UploadDirectoryToRemoteAsync(string localPath, string remotePath, VpsSettings vps, LogCallback log, string? serviceId, System.Threading.CancellationToken ct)
