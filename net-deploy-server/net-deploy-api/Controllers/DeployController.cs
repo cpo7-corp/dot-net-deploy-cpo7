@@ -266,18 +266,27 @@ public class DeployController(
 
             if (request.WaitAllBuildsToDeploy)
             {
-                if (request.Pull || request.Build)
+                if (request.Pull || request.Build || request.Deploy)
                 {
                     await Log("INFO", "🔨 [PHASE 2] Building all services (waiting for all builds before deploy)...");
                     var prepTasks = request.Services.Select(async config =>
                     {
-                        if (cts.IsCancellationRequested) return;
+                        if (cts.IsCancellationRequested) return false;
                         pauseEvent.Wait(cts.Token);
                         var srv = await servicesLogic.GetByIdAsync(config.ServiceId);
-                        if (srv != null) await EnsureServicePrepared(srv, config.Branch);
+                        if (srv == null) return false;
+                        var (prepSuccess, _) = await EnsureServicePrepared(srv, config.Branch);
+                        return prepSuccess;
                     });
-                    await Task.WhenAll(prepTasks);
+                    var prepResults = await Task.WhenAll(prepTasks);
                     if (cts.IsCancellationRequested) { await Log("WARNING", "🛑 Deployment cancelled after preparation phase."); return; }
+
+                    if (prepResults.Any(success => !success))
+                    {
+                        await Log("ERROR", "❌ One or more service builds failed. Deployment phase cancelled — no files will be deployed.");
+                        return;
+                    }
+
                     await Log("INFO", "✅ [PHASE 2] All service builds completed. Starting deployment phase...");
                 }
 

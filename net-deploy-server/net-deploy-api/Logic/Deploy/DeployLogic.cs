@@ -74,7 +74,43 @@ public class DeployLogic(
 
             if (isDockerDeployment)
             {
-                await log("INFO", $"🐳 [Docker] Repository ready at: {repoLocalPath}", service.Id);
+                await log("INFO", $"🐳 [Docker] Applying environment configs & variables for {service.Name}...", service.Id);
+                await ApplyEnvironmentConfigsAsync(envConfig, vps, repoLocalPath, log, service.Id, effectiveProjectPath);
+
+                var (dockerPrepOk, composeFile, envComposeFile, overrideFile, composeServiceName) =
+                    await PrepareDockerConfigurationAsync(service, envConfig, vps, repoLocalPath, effectiveProjectPath, log, ct);
+
+                if (!dockerPrepOk)
+                {
+                    return false;
+                }
+
+                var isLocalDocker = vps == null || vps.IsLocal || string.IsNullOrWhiteSpace(vps.Host) || vps.Host is "localhost" or "127.0.0.1";
+                if (!skipBuildIfOutputExists && isLocalDocker)
+                {
+                    await log("INFO", $"🔨 [Docker] Building container image locally for {service.Name}...", service.Id);
+                    var buildOk = await dockerLogic.RunComposeAsync(
+                        repoLocalPath,
+                        composeFile,
+                        envComposeFile,
+                        overrideFile,
+                        composeServiceName,
+                        service.DockerComposeProjectName,
+                        "build",
+                        vps,
+                        log,
+                        service.Id,
+                        ct);
+
+                    if (!buildOk)
+                    {
+                        await log("ERROR", $"❌ [Docker] Local Docker build failed for {service.Name}.", service.Id);
+                        return false;
+                    }
+                    await log("SUCCESS", $"✅ [Docker] Images built successfully for {service.Name}.", service.Id);
+                }
+
+                await log("SUCCESS", $"✅ [Prep] Prepared and configured: {service.Name}", service.Id);
                 return true;
             }
 
@@ -381,96 +417,16 @@ public class DeployLogic(
 
             var currentVersion = await gitLogic.GetCurrentCommitAsync(repoLocalPath, effectiveBranch);
 
-            // 1. Prepare Environment Variables & AppSettings overrides into .env
-            var allVariables = new List<EnvVariable>();
-            if (envConfig.ConfigSetIds != null)
-            {
-                foreach (var cid in envConfig.ConfigSetIds)
-                {
-                    var cs = await envConfigsLogic.GetByIdAsync(cid);
-                    if (cs?.Variables != null) allVariables.AddRange(cs.Variables);
-                }
-            }
-            if (vps?.SharedVariables != null)
-            {
-                allVariables.AddRange(vps.SharedVariables);
-            }
+            // 1. Ensure environment configs & variable overrides are applied to repository files
+            await ApplyEnvironmentConfigsAsync(envConfig, vps, repoLocalPath, log, serviceId, effectiveProjectPath);
 
-            // 2. Locate or generate Compose files
-            var composeFile = GetDockerComposeFile(service);
-            var composeFullPath = Path.Combine(repoLocalPath, composeFile);
-            var usesExistingCompose = File.Exists(composeFullPath);
-            var composeServiceName = GetDockerComposeServiceName(service);
-            var environmentComposeFile = GetDockerEnvironmentComposeFile(envConfig);
-            string? overrideFile = null;
+            // 2. Prepare Docker Compose & environment files
+            var (dockerPrepOk, composeFile, environmentComposeFile, overrideFile, composeServiceName) =
+                await PrepareDockerConfigurationAsync(service, envConfig, vps, repoLocalPath, effectiveProjectPath, log, ct);
 
-            if (!string.IsNullOrWhiteSpace(environmentComposeFile) &&
-                !File.Exists(Path.Combine(repoLocalPath, environmentComposeFile)))
+            if (!dockerPrepOk)
             {
-                await log("ERROR", $"❌ [Docker] Environment Compose file not found: {environmentComposeFile}", serviceId);
                 return (false, null, sw.Elapsed.TotalSeconds, 0);
-            }
-
-            if (usesExistingCompose)
-            {
-                if (string.IsNullOrWhiteSpace(composeServiceName))
-                {
-                    await log("ERROR", "❌ [Docker] Compose Service Name is required when deploying from an existing Compose file.", serviceId);
-                    return (false, null, sw.Elapsed.TotalSeconds, 0);
-                }
-
-                if (!IsValidComposeName(composeServiceName) || !IsValidComposeName(service.DockerComposeProjectName))
-                {
-                    await log("ERROR", "❌ [Docker] Compose service/project names may contain only letters, numbers, dots, underscores and hyphens.", serviceId);
-                    return (false, null, sw.Elapsed.TotalSeconds, 0);
-                }
-
-                var envFile = GetDockerEnvFile(composeServiceName);
-                overrideFile = GetDockerOverrideFile(composeServiceName);
-                await File.WriteAllTextAsync(Path.Combine(repoLocalPath, envFile), dockerLogic.GenerateEnvFileContent(allVariables), ct);
-                await File.WriteAllTextAsync(Path.Combine(repoLocalPath, overrideFile), dockerLogic.GenerateComposeOverride(composeServiceName, envFile), ct);
-                await log("INFO", $"⚙️ [Docker] Configured {allVariables.Count} environment variables for Compose service '{composeServiceName}'.", serviceId);
-            }
-            else
-            {
-                if (service.ServiceType == "DockerCompose")
-                {
-                    await log("ERROR", $"❌ [Docker] Compose file not found: {composeFullPath}", serviceId);
-                    return (false, null, sw.Elapsed.TotalSeconds, 0);
-                }
-
-                await File.WriteAllTextAsync(
-                    Path.Combine(repoLocalPath, ".env"),
-                    dockerLogic.GenerateEnvFileContent(allVariables),
-                    ct);
-
-                var dockerfile = !string.IsNullOrWhiteSpace(service.DockerfilePath) ? service.DockerfilePath : "Dockerfile";
-                var dockerfileFullPath = ResolveDockerfilePath(repoLocalPath, effectiveProjectPath, dockerfile);
-                if (dockerfileFullPath == null)
-                {
-                    await log("ERROR", $"❌ [Docker] Dockerfile not found in the repository root or project directory: {dockerfile}", serviceId);
-                    return (false, null, sw.Elapsed.TotalSeconds, 0);
-                }
-
-                dockerfile = Path.GetRelativePath(repoLocalPath, dockerfileFullPath).Replace('\\', '/');
-
-                var port = envConfig.DockerPort ?? 8080;
-                await File.WriteAllTextAsync(
-                    composeFullPath,
-                    dockerLogic.GenerateComposeWithLoadBalancer(
-                        service.Name,
-                        GetDockerContainerName(service),
-                        dockerfile,
-                        port,
-                        port,
-                        envConfig.DockerReplicas,
-                        envConfig.DockerParallelism,
-                        envConfig.DockerDrainSeconds),
-                    ct);
-                await File.WriteAllTextAsync(
-                    Path.Combine(repoLocalPath, "nginx.conf"),
-                    dockerLogic.GenerateNginxConf(service.Name, port, port),
-                    ct);
             }
 
             // 3. Transfer to the target server and deploy via Docker Compose
@@ -714,8 +670,119 @@ public class DeployLogic(
         return (true, heartbeatSuccess, transferDuration, heartbeatDuration);
     }
 
-    private async Task ApplyEnvironmentConfigsAsync(ServiceEnvironmentConfig envConfig, VpsSettings? vps, string publishOutput, LogCallback log, string? serviceId)
+    private async Task<(bool Success, string ComposeFile, string? EnvironmentComposeFile, string? OverrideFile, string ComposeServiceName)> PrepareDockerConfigurationAsync(
+        ServiceDefinitionDB service,
+        ServiceEnvironmentConfig envConfig,
+        VpsSettings? vps,
+        string repoLocalPath,
+        string effectiveProjectPath,
+        LogCallback log,
+        CancellationToken ct)
     {
+        var serviceId = service.Id;
+
+        // 1. Gather all variables
+        var allVariables = new List<EnvVariable>();
+        if (envConfig.ConfigSetIds != null)
+        {
+            foreach (var cid in envConfig.ConfigSetIds)
+            {
+                var cs = await envConfigsLogic.GetByIdAsync(cid);
+                if (cs?.Variables != null) allVariables.AddRange(cs.Variables);
+            }
+        }
+        if (vps?.SharedVariables != null)
+        {
+            allVariables.AddRange(vps.SharedVariables);
+        }
+
+        // 2. Locate or generate Compose files
+        var composeFile = GetDockerComposeFile(service);
+        var composeFullPath = Path.Combine(repoLocalPath, composeFile);
+        var usesExistingCompose = File.Exists(composeFullPath);
+        var composeServiceName = GetDockerComposeServiceName(service);
+        var environmentComposeFile = GetDockerEnvironmentComposeFile(envConfig);
+        string? overrideFile = null;
+
+        if (!string.IsNullOrWhiteSpace(environmentComposeFile) &&
+            !File.Exists(Path.Combine(repoLocalPath, environmentComposeFile)))
+        {
+            await log("ERROR", $"❌ [Docker] Environment Compose file not found: {environmentComposeFile}", serviceId);
+            return (false, composeFile, environmentComposeFile, null, composeServiceName);
+        }
+
+        if (usesExistingCompose)
+        {
+            if (string.IsNullOrWhiteSpace(composeServiceName))
+            {
+                await log("ERROR", "❌ [Docker] Compose Service Name is required when deploying from an existing Compose file.", serviceId);
+                return (false, composeFile, environmentComposeFile, null, composeServiceName);
+            }
+
+            if (!IsValidComposeName(composeServiceName) || !IsValidComposeName(service.DockerComposeProjectName))
+            {
+                await log("ERROR", "❌ [Docker] Compose service/project names may contain only letters, numbers, dots, underscores and hyphens.", serviceId);
+                return (false, composeFile, environmentComposeFile, null, composeServiceName);
+            }
+
+            var envFile = GetDockerEnvFile(composeServiceName);
+            overrideFile = GetDockerOverrideFile(composeServiceName);
+            await File.WriteAllTextAsync(Path.Combine(repoLocalPath, envFile), dockerLogic.GenerateEnvFileContent(allVariables), ct);
+            await File.WriteAllTextAsync(Path.Combine(repoLocalPath, overrideFile), dockerLogic.GenerateComposeOverride(composeServiceName, envFile), ct);
+            await log("INFO", $"⚙️ [Docker] Configured {allVariables.Count} environment variables for Compose service '{composeServiceName}'.", serviceId);
+        }
+        else
+        {
+            if (service.ServiceType == "DockerCompose")
+            {
+                await log("ERROR", $"❌ [Docker] Compose file not found: {composeFullPath}", serviceId);
+                return (false, composeFile, environmentComposeFile, null, composeServiceName);
+            }
+
+            await File.WriteAllTextAsync(
+                Path.Combine(repoLocalPath, ".env"),
+                dockerLogic.GenerateEnvFileContent(allVariables),
+                ct);
+
+            var dockerfile = !string.IsNullOrWhiteSpace(service.DockerfilePath) ? service.DockerfilePath : "Dockerfile";
+            var dockerfileFullPath = ResolveDockerfilePath(repoLocalPath, effectiveProjectPath, dockerfile);
+            if (dockerfileFullPath == null)
+            {
+                await log("ERROR", $"❌ [Docker] Dockerfile not found in the repository root or project directory: {dockerfile}", serviceId);
+                return (false, composeFile, environmentComposeFile, null, composeServiceName);
+            }
+
+            dockerfile = Path.GetRelativePath(repoLocalPath, dockerfileFullPath).Replace('\\', '/');
+
+            var port = envConfig.DockerPort ?? 8080;
+            await File.WriteAllTextAsync(
+                composeFullPath,
+                dockerLogic.GenerateComposeWithLoadBalancer(
+                    service.Name,
+                    GetDockerContainerName(service),
+                    dockerfile,
+                    port,
+                    port,
+                    envConfig.DockerReplicas,
+                    envConfig.DockerParallelism,
+                    envConfig.DockerDrainSeconds),
+                ct);
+            await File.WriteAllTextAsync(
+                Path.Combine(repoLocalPath, "nginx.conf"),
+                dockerLogic.GenerateNginxConf(service.Name, port, port),
+                ct);
+            await log("INFO", $"⚙️ [Docker] Generated Compose configuration with load balancer (port {port}).", serviceId);
+        }
+
+        return (true, composeFile, environmentComposeFile, overrideFile, composeServiceName);
+    }
+
+    private async Task ApplyEnvironmentConfigsAsync(ServiceEnvironmentConfig envConfig, VpsSettings? vps, string publishOutput, LogCallback log, string? serviceId, string? effectiveProjectPath = null)
+    {
+        var projDir = !string.IsNullOrWhiteSpace(effectiveProjectPath)
+            ? (Path.HasExtension(effectiveProjectPath) ? Path.GetDirectoryName(effectiveProjectPath) : effectiveProjectPath)
+            : null;
+
         // 1. Auto-rename based on Environment Tag (e.g. *.prod.json -> *.json)
         var envTag = vps?.EnvironmentTag;
         if (!string.IsNullOrWhiteSpace(envTag))
@@ -726,6 +793,10 @@ public class DeployLogic(
 
             foreach (var sourceFile in filesToRename)
             {
+                var norm = sourceFile.Replace('\\', '/');
+                if (norm.Contains("/.git/") || norm.Contains("/bin/") || norm.Contains("/obj/") || norm.Contains("/node_modules/"))
+                    continue;
+
                 var fileName = Path.GetFileName(sourceFile);
                 var targetFileName = fileName.Replace($".{envTag}.json", ".json", StringComparison.OrdinalIgnoreCase);
                 var targetFile = Path.Combine(Path.GetDirectoryName(sourceFile)!, targetFileName);
@@ -750,10 +821,22 @@ public class DeployLogic(
                 var sourcePath = Path.Combine(publishOutput, rename.SourceFileName);
                 var targetPath = Path.Combine(publishOutput, rename.TargetFileName);
 
+                if (!File.Exists(sourcePath) && !string.IsNullOrWhiteSpace(projDir))
+                {
+                    var candidate = Path.Combine(publishOutput, projDir, rename.SourceFileName);
+                    if (File.Exists(candidate))
+                    {
+                        sourcePath = candidate;
+                        targetPath = Path.Combine(publishOutput, projDir, rename.TargetFileName);
+                    }
+                }
+
                 if (File.Exists(sourcePath))
                 {
                     try
                     {
+                        var dir = Path.GetDirectoryName(targetPath);
+                        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
                         File.Copy(sourcePath, targetPath, overwrite: true);
                         await log("INFO", $"🔄 Shared Overwrite: '{rename.SourceFileName}' -> '{rename.TargetFileName}'", serviceId);
                     }
@@ -788,6 +871,16 @@ public class DeployLogic(
                     var targetName = string.IsNullOrWhiteSpace(configSet.TargetFileName) ? configSet.SourceFileName : configSet.TargetFileName;
                     var targetPath = Path.Combine(publishOutput, targetName);
 
+                    if (!File.Exists(sourcePath) && !string.IsNullOrWhiteSpace(projDir))
+                    {
+                        var candidate = Path.Combine(publishOutput, projDir, configSet.SourceFileName);
+                        if (File.Exists(candidate))
+                        {
+                            sourcePath = candidate;
+                            targetPath = Path.Combine(publishOutput, projDir, targetName);
+                        }
+                    }
+
                     targetFileForVariables = targetName;
 
                     // Only copy/rename if target is different from source
@@ -795,6 +888,8 @@ public class DeployLogic(
                     {
                         try
                         {
+                            var dir = Path.GetDirectoryName(targetPath);
+                            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir)) Directory.CreateDirectory(dir);
                             if (File.Exists(targetPath)) File.Delete(targetPath);
                             File.Copy(sourcePath, targetPath, overwrite: true);
                             await log("INFO", $"✨ [Variables] File Rename: '{configSet.SourceFileName}' -> '{targetName}'", serviceId);
@@ -810,12 +905,25 @@ public class DeployLogic(
                 // 2. Apply Variables from Config Set to the target file
                 if (configSet.Variables != null && configSet.Variables.Count > 0)
                 {
-                    var targetPath = Path.Combine(publishOutput, targetFileForVariables);
-                    if (File.Exists(targetPath))
+                    var appliedAny = false;
+                    var targetPathRoot = Path.Combine(publishOutput, targetFileForVariables);
+                    if (File.Exists(targetPathRoot))
                     {
-                        await ApplyJsonVariablesAsync(targetPath, configSet.Variables, log, serviceId, configSet.Name);
+                        await ApplyJsonVariablesAsync(targetPathRoot, configSet.Variables, log, serviceId, configSet.Name);
+                        appliedAny = true;
                     }
-                    else
+
+                    if (!string.IsNullOrWhiteSpace(projDir))
+                    {
+                        var targetPathProj = Path.Combine(publishOutput, projDir, targetFileForVariables);
+                        if (File.Exists(targetPathProj) && !string.Equals(targetPathProj, targetPathRoot, StringComparison.OrdinalIgnoreCase))
+                        {
+                            await ApplyJsonVariablesAsync(targetPathProj, configSet.Variables, log, serviceId, configSet.Name);
+                            appliedAny = true;
+                        }
+                    }
+
+                    if (!appliedAny)
                     {
                         await log("WARNING", $"⚠️ [ConfigSet] Target file '{targetFileForVariables}' not found for variables.", serviceId);
                     }
@@ -826,10 +934,23 @@ public class DeployLogic(
         // 4. Shared JSON Variable Overrides (from VPS Settings - Global)
         if (vps?.SharedVariables != null && vps.SharedVariables.Count > 0)
         {
-            var targetFile = Path.Combine(publishOutput, "appsettings.json");
-            if (File.Exists(targetFile))
+            var targetFiles = new List<string>();
+            var rootAppSettings = Path.Combine(publishOutput, "appsettings.json");
+            if (File.Exists(rootAppSettings)) targetFiles.Add(rootAppSettings);
+
+            var rootSharedSettings = Path.Combine(publishOutput, "shared-settings.json");
+            if (File.Exists(rootSharedSettings)) targetFiles.Add(rootSharedSettings);
+
+            if (!string.IsNullOrWhiteSpace(projDir))
             {
-                await ApplyJsonVariablesAsync(targetFile, vps.SharedVariables, log, serviceId, "Shared-VPS");
+                var projAppSettings = Path.Combine(publishOutput, projDir, "appsettings.json");
+                if (File.Exists(projAppSettings) && !targetFiles.Contains(projAppSettings))
+                    targetFiles.Add(projAppSettings);
+            }
+
+            foreach (var tf in targetFiles)
+            {
+                await ApplyJsonVariablesAsync(tf, vps.SharedVariables, log, serviceId, "Shared-VPS");
             }
         }
     }

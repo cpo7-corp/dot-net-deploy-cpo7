@@ -142,6 +142,7 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
         var isRemote = IsRemote(vps);
         var composeAction = action switch
         {
+            "build" => "build",
             "deploy" => "up -d --build --no-deps",
             "start" => "start",
             "stop" => "stop",
