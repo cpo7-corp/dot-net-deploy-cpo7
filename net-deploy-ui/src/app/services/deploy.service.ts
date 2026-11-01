@@ -114,20 +114,26 @@ export class DeployService extends ApiService {
     const row = { ...progress[serviceId] };
 
     // BUILD PHASE
-    if (message.includes('🔨 [Prep] Building') || message.includes('📥 [Prep] Pulling')) {
+    if (message.includes('🔨 [Prep] Building') ||
+        message.includes('📥 [Prep] Pulling') ||
+        message.includes('[Docker] Building') ||
+        message.includes('[Docker] Applying environment configs')) {
       row.compiled = 'process';
       if (!row.buildStartTime) row.buildStartTime = Date.now();
     }
     if (message.includes('✅ [Prep] Prepared') ||
         message.includes('⏭️ [Prep] Build output already exists') ||
         message.includes('🐳 [Docker] Repository ready') ||
+        message.includes('✅ [Docker] Images built') ||
         (message.includes('✅') && message.includes('built'))) {
       row.compiled = 'success';
       if (row.buildStartTime && !row.buildTime) {
         row.buildTime = ((Date.now() - row.buildStartTime) / 1000).toFixed(1) + 's';
       }
     }
-    if (message.includes('❌ Preparation failed') || message.includes('❌ Build failed')) {
+    if (message.includes('❌ Preparation failed') ||
+        message.includes('❌ Build failed') ||
+        message.includes('❌ [Docker]')) {
       row.compiled = 'error';
       if (row.buildStartTime && !row.buildTime) {
         row.buildTime = ((Date.now() - row.buildStartTime) / 1000).toFixed(1) + 's';

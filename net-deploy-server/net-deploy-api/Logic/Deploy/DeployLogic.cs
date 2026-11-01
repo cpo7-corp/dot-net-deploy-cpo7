@@ -74,6 +74,7 @@ public class DeployLogic(
 
             if (isDockerDeployment)
             {
+                await log("INFO", $"🔨 [Prep] Building & configuring {service.Name} (Docker)...", service.Id);
                 await log("INFO", $"🐳 [Docker] Applying environment configs & variables for {service.Name}...", service.Id);
                 await ApplyEnvironmentConfigsAsync(envConfig, vps, repoLocalPath, log, service.Id, effectiveProjectPath);
 
