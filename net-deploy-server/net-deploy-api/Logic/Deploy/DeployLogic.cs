@@ -87,11 +87,31 @@ public class DeployLogic(
                 }
 
                 var isLocalDocker = vps == null || vps.IsLocal || string.IsNullOrWhiteSpace(vps.Host) || vps.Host is "localhost" or "127.0.0.1";
-                if (!skipBuildIfOutputExists && isLocalDocker)
+                if (!skipBuildIfOutputExists)
                 {
-                    await log("INFO", $"🔨 [Docker] Building container image locally for {service.Name}...", service.Id);
+                    string buildPath;
+                    if (isLocalDocker)
+                    {
+                        buildPath = repoLocalPath;
+                        await log("INFO", $"🔨 [Docker] Building container image locally for {service.Name}...", service.Id);
+                    }
+                    else
+                    {
+                        buildPath = GetDockerTargetPath(service, envConfig, vps);
+                        await log("INFO", $"🔨 [Docker] Preparing remote directory and transferring files for {service.Name}...", service.Id);
+                        if (!await dockerLogic.PrepareRemoteDirectoryAsync(buildPath, vps!, log, service.Id))
+                        {
+                            return false;
+                        }
+                        if (!await transferManager.TransferAsync(repoLocalPath, buildPath, vps, log, service.Id, ct))
+                        {
+                            return false;
+                        }
+                        await log("INFO", $"🔨 [Docker] Building container image on VPS for {service.Name}...", service.Id);
+                    }
+
                     var buildOk = await dockerLogic.RunComposeAsync(
-                        repoLocalPath,
+                        buildPath,
                         composeFile,
                         envComposeFile,
                         overrideFile,
@@ -105,7 +125,7 @@ public class DeployLogic(
 
                     if (!buildOk)
                     {
-                        await log("ERROR", $"❌ [Docker] Local Docker build failed for {service.Name}.", service.Id);
+                        await log("ERROR", $"❌ [Docker] Docker image build failed for {service.Name}.", service.Id);
                         return false;
                     }
                     await log("SUCCESS", $"✅ [Docker] Images built successfully for {service.Name}.", service.Id);
@@ -160,7 +180,10 @@ public class DeployLogic(
                 return false;
             }
             var composeFile = GetDockerComposeFile(service);
-            var targetPath = GetDockerTargetPath(service, envConfig, vps);
+            var isRemote = vps != null && !vps.IsLocal && !string.IsNullOrWhiteSpace(vps.Host) && vps.Host != "localhost" && vps.Host != "127.0.0.1";
+            var (repoUrl, _, _) = ParseGitUrl(service.RepoUrl);
+            var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl);
+            var targetPath = isRemote ? GetDockerTargetPath(service, envConfig, vps) : repoLocalPath;
             var environmentComposeFile = GetDockerEnvironmentComposeFile(envConfig);
             var composeServiceName = GetDockerComposeServiceName(service);
             if (string.IsNullOrWhiteSpace(composeServiceName))
@@ -168,17 +191,38 @@ public class DeployLogic(
                 await log("ERROR", "❌ [Docker] Compose Service Name is required for a single-service action.", service.Id);
                 return false;
             }
-            return await dockerLogic.RunComposeAsync(
+
+            string? overrideFile = GetDockerOverrideFile(composeServiceName, composeFile);
+            if (!isRemote && !File.Exists(Path.Combine(targetPath, overrideFile)))
+            {
+                overrideFile = null;
+            }
+
+            var composeOk = await dockerLogic.RunComposeAsync(
                 targetPath,
                 composeFile,
                 environmentComposeFile,
-                GetDockerOverrideFile(composeServiceName, composeFile),
+                overrideFile,
                 composeServiceName,
                 service.DockerComposeProjectName,
                 action,
                 vps,
                 log,
                 service.Id);
+
+            if (!composeOk && action is "stop" or "restart")
+            {
+                await log("WARNING", $"⚠️ [Docker] Compose action '{action}' failed, attempting direct container command...", service.Id);
+                var containerName = GetDockerContainerName(service);
+                var directOk = await dockerLogic.ManageContainerAsync(containerName, action, log, service.Id, vps);
+                if (!directOk && !string.Equals(containerName, composeServiceName, StringComparison.OrdinalIgnoreCase))
+                {
+                    directOk = await dockerLogic.ManageContainerAsync(composeServiceName, action, log, service.Id, vps);
+                }
+                return directOk;
+            }
+
+            return composeOk;
         }
 
         if (vps?.ServerType == "Linux")

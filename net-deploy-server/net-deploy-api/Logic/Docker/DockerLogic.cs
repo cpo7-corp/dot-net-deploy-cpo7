@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Deploy;
 using Renci.SshNet;
@@ -143,7 +143,7 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
         var composeAction = action switch
         {
             "build" => "build",
-            "deploy" => "up -d --build --no-deps",
+            "deploy" => "up -d --no-deps",
             "start" => "start",
             "stop" => "stop",
             "restart" => "restart",
@@ -180,7 +180,12 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
             client.Connect();
 
             var commandText = BuildRemoteComposeCommand(projectPath, composeArguments, vps!);
-            var command = client.CreateCommand(commandText);
+            using var command = client.CreateCommand(commandText);
+            using var reg = ct.Register(() =>
+            {
+                try { command.CancelAsync(); } catch { }
+                try { client.Disconnect(); } catch { }
+            });
             var output = await Task.Run(command.Execute, ct);
 
             if (command.ExitStatus != 0)

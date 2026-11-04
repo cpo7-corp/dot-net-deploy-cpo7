@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Deploy;
 using NET.Deploy.Api.Logic.DeployLogs;
@@ -343,6 +343,29 @@ public class DeployController(
             await deployLogsLogic.AddRangeAsync(logEntries);
             await Response.WriteAsync("data: {\"level\":\"DONE\",\"message\":\"done\"}\n\n");
             await Response.Body.FlushAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            await Log("WARNING", "🛑 Deployment cancelled by user.");
+            await Log("INFO", "──────────────────────────────────────────────────");
+            try
+            {
+                await deployLogsLogic.AddRangeAsync(logEntries);
+                await Response.WriteAsync("data: {\"level\":\"DONE\",\"message\":\"cancelled\"}\n\n");
+                await Response.Body.FlushAsync();
+            }
+            catch { }
+        }
+        catch (Exception ex)
+        {
+            await Log("ERROR", $"❌ Deployment failed unexpectedly: {ex.Message}");
+            try
+            {
+                await deployLogsLogic.AddRangeAsync(logEntries);
+                await Response.WriteAsync("data: {\"level\":\"DONE\",\"message\":\"error\"}\n\n");
+                await Response.Body.FlushAsync();
+            }
+            catch { }
         }
         finally
         {
