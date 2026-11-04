@@ -1,4 +1,4 @@
-using NET.Deploy.Api.Data.Entities;
+﻿using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Git;
 using NET.Deploy.Api.Logic.Services;
 using System.Text.Json;
@@ -172,7 +172,7 @@ public class DeployLogic(
                 targetPath,
                 composeFile,
                 environmentComposeFile,
-                GetDockerOverrideFile(composeServiceName),
+                GetDockerOverrideFile(composeServiceName, composeFile),
                 composeServiceName,
                 service.DockerComposeProjectName,
                 action,
@@ -528,11 +528,27 @@ public class DeployLogic(
     private static string? GetDockerEnvironmentComposeFile(ServiceEnvironmentConfig envConfig) =>
         envConfig.DockerEnvironmentComposePath;
 
-    private static string GetDockerEnvFile(string composeServiceName) =>
-        $".net-deploy.{composeServiceName}.env";
+    private static string GetDockerEnvFile(string composeServiceName, string? composeFile = null)
+    {
+        var envFileName = $".net-deploy.{composeServiceName}.env";
+        if (string.IsNullOrWhiteSpace(composeFile)) return envFileName;
 
-    private static string GetDockerOverrideFile(string composeServiceName) =>
-        $".net-deploy.{composeServiceName}.override.yml";
+        var composeDir = Path.GetDirectoryName(composeFile);
+        if (string.IsNullOrWhiteSpace(composeDir)) return envFileName;
+
+        return Path.Combine(composeDir, envFileName).Replace('\\', '/');
+    }
+
+    private static string GetDockerOverrideFile(string composeServiceName, string? composeFile = null)
+    {
+        var overrideFileName = $".net-deploy.{composeServiceName}.override.yml";
+        if (string.IsNullOrWhiteSpace(composeFile)) return overrideFileName;
+
+        var composeDir = Path.GetDirectoryName(composeFile);
+        if (string.IsNullOrWhiteSpace(composeDir)) return overrideFileName;
+
+        return Path.Combine(composeDir, overrideFileName).Replace('\\', '/');
+    }
 
     private static bool IsValidComposeName(string? value) =>
         string.IsNullOrWhiteSpace(value) || value.All(character =>
@@ -726,10 +742,18 @@ public class DeployLogic(
                 return (false, composeFile, environmentComposeFile, null, composeServiceName);
             }
 
-            var envFile = GetDockerEnvFile(composeServiceName);
-            overrideFile = GetDockerOverrideFile(composeServiceName);
+            var envFile = GetDockerEnvFile(composeServiceName, composeFile);
+            overrideFile = GetDockerOverrideFile(composeServiceName, composeFile);
+
+            var composeDir = Path.GetDirectoryName(composeFullPath);
+            if (!string.IsNullOrWhiteSpace(composeDir))
+            {
+                Directory.CreateDirectory(composeDir);
+            }
+
+            var envFileNameOnly = Path.GetFileName(envFile);
             await File.WriteAllTextAsync(Path.Combine(repoLocalPath, envFile), dockerLogic.GenerateEnvFileContent(allVariables), ct);
-            await File.WriteAllTextAsync(Path.Combine(repoLocalPath, overrideFile), dockerLogic.GenerateComposeOverride(composeServiceName, envFile), ct);
+            await File.WriteAllTextAsync(Path.Combine(repoLocalPath, overrideFile), dockerLogic.GenerateComposeOverride(composeServiceName, envFileNameOnly), ct);
             await log("INFO", $"⚙️ [Docker] Configured {allVariables.Count} environment variables for Compose service '{composeServiceName}'.", serviceId);
         }
         else
@@ -740,8 +764,19 @@ public class DeployLogic(
                 return (false, composeFile, environmentComposeFile, null, composeServiceName);
             }
 
+            var composeDir = Path.GetDirectoryName(composeFullPath);
+            if (!string.IsNullOrWhiteSpace(composeDir))
+            {
+                Directory.CreateDirectory(composeDir);
+            }
+
+            var composeBaseDir = Path.GetDirectoryName(composeFile);
+            var envDir = string.IsNullOrWhiteSpace(composeBaseDir)
+                ? repoLocalPath
+                : Path.Combine(repoLocalPath, composeBaseDir);
+
             await File.WriteAllTextAsync(
-                Path.Combine(repoLocalPath, ".env"),
+                Path.Combine(envDir, ".env"),
                 dockerLogic.GenerateEnvFileContent(allVariables),
                 ct);
 
@@ -769,7 +804,7 @@ public class DeployLogic(
                     envConfig.DockerDrainSeconds),
                 ct);
             await File.WriteAllTextAsync(
-                Path.Combine(repoLocalPath, "nginx.conf"),
+                Path.Combine(envDir, "nginx.conf"),
                 dockerLogic.GenerateNginxConf(service.Name, port, port),
                 ct);
             await log("INFO", $"⚙️ [Docker] Generated Compose configuration with load balancer (port {port}).", serviceId);
