@@ -157,7 +157,7 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
         {
             // Only run the container from the already-built image — no build here.
             // Build is performed as a separate step before deploy is called.
-            var upArgs = $"compose {projectArgument}-f \"{composeFile}\"{environmentArgument}{overrideArgument} up -d --no-deps --force-recreate{serviceArgument}";
+            var upArgs = $"compose {projectArgument}-f \"{composeFile}\"{environmentArgument}{overrideArgument} up -d --force-recreate{serviceArgument}";
             await log("INFO", $"🚀 [Docker] Starting container from pre-built image for {composeServiceName}...", serviceId);
             if (!await ExecuteDockerCommandAsync(projectPath, upArgs, isRemote, vps, log, serviceId, ct))
                 return false;
