@@ -155,19 +155,14 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
 
         if (action == "deploy")
         {
-            // 1. Build fresh image with --no-cache
-            var buildArgs = $"compose {projectArgument}-f \"{composeFile}\"{environmentArgument}{overrideArgument} build --no-cache{serviceArgument}";
-            await log("INFO", $"🔨 [Docker] Building fresh image (--no-cache) for {composeServiceName}...", serviceId);
-            if (!await ExecuteDockerCommandAsync(projectPath, buildArgs, isRemote, vps, log, serviceId, ct))
-                return false;
-
-            // 2. Up with --force-recreate
+            // Only run the container from the already-built image — no build here.
+            // Build is performed as a separate step before deploy is called.
             var upArgs = $"compose {projectArgument}-f \"{composeFile}\"{environmentArgument}{overrideArgument} up -d --no-deps --force-recreate{serviceArgument}";
-            await log("INFO", $"🚀 [Docker] Deploying container for {composeServiceName}...", serviceId);
+            await log("INFO", $"🚀 [Docker] Starting container from pre-built image for {composeServiceName}...", serviceId);
             if (!await ExecuteDockerCommandAsync(projectPath, upArgs, isRemote, vps, log, serviceId, ct))
                 return false;
 
-            // 3. Prune old/dangling images
+            // Prune old/dangling images
             await log("INFO", "🧹 [Docker] Cleaning up old unused images...", serviceId);
             _ = ExecuteDockerCommandAsync(projectPath, "image prune -f", isRemote, vps, log, serviceId, ct);
 
