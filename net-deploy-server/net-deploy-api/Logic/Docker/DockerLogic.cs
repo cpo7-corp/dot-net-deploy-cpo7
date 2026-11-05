@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Deploy;
 using Renci.SshNet;
@@ -143,7 +143,7 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
         var composeAction = action switch
         {
             "build" => "build",
-            "deploy" => "up -d --no-deps",
+            "deploy" => "up -d --no-deps --build --force-recreate",
             "start" => "start",
             "stop" => "stop",
             "restart" => "restart",
