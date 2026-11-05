@@ -1,4 +1,4 @@
-import { Injectable, NgZone, signal } from '@angular/core';
+﻿import { Injectable, NgZone, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import { DeployLogEntry, PagedResult, ProjectVersion } from '../models/api-models';
 import { Observable, Subject } from 'rxjs';
@@ -118,8 +118,10 @@ export class DeployService extends ApiService {
         message.includes('📥 [Prep] Pulling') ||
         message.includes('[Docker] Building') ||
         message.includes('[Docker] Applying environment configs')) {
-      row.compiled = 'process';
-      if (!row.buildStartTime) row.buildStartTime = Date.now();
+      if (row.deployed !== 'process' && row.deployed !== 'success') {
+        row.compiled = 'process';
+        if (!row.buildStartTime) row.buildStartTime = Date.now();
+      }
     }
     if (message.includes('✅ [Prep] Prepared') ||
         message.includes('⏭️ [Prep] Build output already exists') ||

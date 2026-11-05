@@ -494,29 +494,7 @@ public class DeployLogic(
                 targetPath = repoLocalPath;
             }
 
-            // 3a. Build fresh image (always from source, --no-cache)
-            await log("INFO", $"🔨 [Docker] Building image (--no-cache) for {composeServiceName}...", serviceId);
-            var buildOk = await dockerLogic.RunComposeAsync(
-                targetPath,
-                composeFile,
-                environmentComposeFile,
-                overrideFile,
-                composeServiceName,
-                service.DockerComposeProjectName,
-                "build",
-                vps,
-                log,
-                serviceId,
-                ct);
-
-            if (!buildOk)
-            {
-                await log("ERROR", $"❌ [Docker] Image build failed for {composeServiceName}.", serviceId);
-                return (false, null, sw.Elapsed.TotalSeconds, 0);
-            }
-            await log("SUCCESS", $"✅ [Docker] Image built successfully for {composeServiceName}.", serviceId);
-
-            // 3b. Deploy: start container from the already-built image (no build here)
+            // 3. Deploy: start container from the already-built image (no build here)
             var composeOk = await dockerLogic.RunComposeAsync(
                 targetPath,
                 composeFile,

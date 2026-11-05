@@ -1,4 +1,4 @@
-using System.Text;
+﻿using System.Text;
 using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Deploy;
 using Renci.SshNet;
@@ -164,7 +164,7 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
 
             // Prune old/dangling images
             await log("INFO", "🧹 [Docker] Cleaning up old unused images...", serviceId);
-            _ = ExecuteDockerCommandAsync(projectPath, "image prune -f", isRemote, vps, log, serviceId, ct);
+            await ExecuteDockerCommandAsync(projectPath, "image prune -f", isRemote, vps, log, serviceId, ct);
 
             return true;
         }
