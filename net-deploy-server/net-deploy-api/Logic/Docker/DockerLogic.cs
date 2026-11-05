@@ -140,15 +140,6 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
         CancellationToken ct = default)
     {
         var isRemote = IsRemote(vps);
-        var composeAction = action switch
-        {
-            "build" => "build",
-            "deploy" => "up -d --no-deps --build --force-recreate",
-            "start" => "start",
-            "stop" => "stop",
-            "restart" => "restart",
-            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Unsupported Docker Compose action.")
-        };
         var projectArgument = !string.IsNullOrWhiteSpace(composeProjectName)
             ? $"-p \"{composeProjectName}\" "
             : string.Empty;
@@ -161,13 +152,55 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
         var serviceArgument = !string.IsNullOrWhiteSpace(composeServiceName)
             ? $" \"{composeServiceName}\""
             : string.Empty;
-        var composeArguments = $"compose {projectArgument}-f \"{composeFile}\"{environmentArgument}{overrideArgument} {composeAction}{serviceArgument}";
 
+        if (action == "deploy")
+        {
+            // 1. Build fresh image with --no-cache
+            var buildArgs = $"compose {projectArgument}-f \"{composeFile}\"{environmentArgument}{overrideArgument} build --no-cache{serviceArgument}";
+            await log("INFO", $"🔨 [Docker] Building fresh image (--no-cache) for {composeServiceName}...", serviceId);
+            if (!await ExecuteDockerCommandAsync(projectPath, buildArgs, isRemote, vps, log, serviceId, ct))
+                return false;
+
+            // 2. Up with --force-recreate
+            var upArgs = $"compose {projectArgument}-f \"{composeFile}\"{environmentArgument}{overrideArgument} up -d --no-deps --force-recreate{serviceArgument}";
+            await log("INFO", $"🚀 [Docker] Deploying container for {composeServiceName}...", serviceId);
+            if (!await ExecuteDockerCommandAsync(projectPath, upArgs, isRemote, vps, log, serviceId, ct))
+                return false;
+
+            // 3. Prune old/dangling images
+            await log("INFO", "🧹 [Docker] Cleaning up old unused images...", serviceId);
+            _ = ExecuteDockerCommandAsync(projectPath, "image prune -f", isRemote, vps, log, serviceId, ct);
+
+            return true;
+        }
+
+        var composeAction = action switch
+        {
+            "build" => "build --no-cache",
+            "start" => "start",
+            "stop" => "stop",
+            "restart" => "restart",
+            _ => throw new ArgumentOutOfRangeException(nameof(action), action, "Unsupported Docker Compose action.")
+        };
+
+        var composeArguments = $"compose {projectArgument}-f \"{composeFile}\"{environmentArgument}{overrideArgument} {composeAction}{serviceArgument}";
+        return await ExecuteDockerCommandAsync(projectPath, composeArguments, isRemote, vps, log, serviceId, ct);
+    }
+
+    private async Task<bool> ExecuteDockerCommandAsync(
+        string projectPath,
+        string dockerArguments,
+        bool isRemote,
+        VpsSettings? vps,
+        LogCallback log,
+        string? serviceId,
+        CancellationToken ct)
+    {
         if (!isRemote)
         {
             return await processRunner.RunAsync(
                 "docker",
-                composeArguments,
+                dockerArguments,
                 projectPath,
                 log,
                 serviceId,
@@ -179,7 +212,7 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
             using var client = CreateSshClient(vps!);
             client.Connect();
 
-            var commandText = BuildRemoteComposeCommand(projectPath, composeArguments, vps!);
+            var commandText = BuildRemoteComposeCommand(projectPath, dockerArguments, vps!);
             using var command = client.CreateCommand(commandText);
             using var reg = ct.Register(() =>
             {
@@ -190,7 +223,7 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
 
             if (command.ExitStatus != 0)
             {
-                await log("ERROR", $"❌ [Docker] Docker Compose failed on VPS: {command.Error.Trim()}", serviceId);
+                await log("ERROR", $"❌ [Docker] Command failed on VPS: {command.Error.Trim()}", serviceId);
                 return false;
             }
 
@@ -203,7 +236,7 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
         }
         catch (Exception ex)
         {
-            await log("ERROR", $"❌ [Docker] Docker Compose failed on VPS: {ex.Message}", serviceId);
+            await log("ERROR", $"❌ [Docker] Command failed on VPS: {ex.Message}", serviceId);
             return false;
         }
     }
