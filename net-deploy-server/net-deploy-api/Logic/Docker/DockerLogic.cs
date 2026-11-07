@@ -162,16 +162,16 @@ public class DockerLogic(ILogger<DockerLogic> logger, ProcessRunner processRunne
             if (!await ExecuteDockerCommandAsync(projectPath, upArgs, isRemote, vps, log, serviceId, ct))
                 return false;
 
-            // Prune old/dangling images
-            await log("INFO", "🧹 [Docker] Cleaning up old unused images...", serviceId);
-            await ExecuteDockerCommandAsync(projectPath, "image prune -f", isRemote, vps, log, serviceId, ct);
+            // Prune old/dangling images (background, non-blocking)
+            await log("INFO", "🧹 [Docker] Cleaning up old unused images in background...", serviceId);
+            _ = ExecuteDockerCommandAsync(projectPath, "image prune -f", isRemote, vps, log, serviceId, default);
 
             return true;
         }
 
         var composeAction = action switch
         {
-            "build" => "build --no-cache",
+            "build" => "build",
             "start" => "start",
             "stop" => "stop",
             "restart" => "restart",

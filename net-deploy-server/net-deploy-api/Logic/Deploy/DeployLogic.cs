@@ -59,7 +59,14 @@ public class DeployLogic(
         var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl, effectiveProjectPath);
         var projectFullPath = Path.Combine(repoLocalPath, effectiveProjectPath);
 
-        // LOCK START: Ensure only one service works on this repository folder at a time
+        string composeFile = string.Empty;
+        string? envComposeFile = null;
+        string? overrideFile = null;
+        string composeServiceName = string.Empty;
+        string buildPath = string.Empty;
+        bool isLocalDocker = false;
+
+        // LOCK START: Ensure only one service modifies this local repository folder at a time
         var @lock = RepositoryLockManager.Get(repoLocalPath);
         await @lock.WaitAsync(ct);
 
@@ -78,7 +85,7 @@ public class DeployLogic(
                 await log("INFO", $"🐳 [Docker] Applying environment configs & variables for {service.Name}...", service.Id);
                 await ApplyEnvironmentConfigsAsync(envConfig, vps, repoLocalPath, log, service.Id, effectiveProjectPath);
 
-                var (dockerPrepOk, composeFile, envComposeFile, overrideFile, composeServiceName) =
+                var (dockerPrepOk, cFile, envCFile, oFile, cServiceName) =
                     await PrepareDockerConfigurationAsync(service, envConfig, vps, repoLocalPath, effectiveProjectPath, log, ct);
 
                 if (!dockerPrepOk)
@@ -86,14 +93,17 @@ public class DeployLogic(
                     return false;
                 }
 
-                var isLocalDocker = vps == null || vps.IsLocal || string.IsNullOrWhiteSpace(vps.Host) || vps.Host is "localhost" or "127.0.0.1";
+                composeFile = cFile;
+                envComposeFile = envCFile;
+                overrideFile = oFile;
+                composeServiceName = cServiceName;
+
+                isLocalDocker = vps == null || vps.IsLocal || string.IsNullOrWhiteSpace(vps.Host) || vps.Host is "localhost" or "127.0.0.1";
                 if (!skipBuildIfOutputExists)
                 {
-                    string buildPath;
                     if (isLocalDocker)
                     {
                         buildPath = repoLocalPath;
-                        await log("INFO", $"🔨 [Docker] Building container image locally for {service.Name}...", service.Id);
                     }
                     else
                     {
@@ -107,61 +117,79 @@ public class DeployLogic(
                         {
                             return false;
                         }
-                        await log("INFO", $"🔨 [Docker] Building container image on VPS for {service.Name}...", service.Id);
                     }
-
-                    var buildOk = await dockerLogic.RunComposeAsync(
-                        buildPath,
-                        composeFile,
-                        envComposeFile,
-                        overrideFile,
-                        composeServiceName,
-                        service.DockerComposeProjectName,
-                        "build",
-                        vps,
-                        log,
-                        service.Id,
-                        ct);
-
-                    if (!buildOk)
-                    {
-                        await log("ERROR", $"❌ [Docker] Docker image build failed for {service.Name}.", service.Id);
-                        return false;
-                    }
-                    await log("SUCCESS", $"✅ [Docker] Images built successfully for {service.Name}.", service.Id);
                 }
-
-                await log("SUCCESS", $"✅ [Prep] Prepared and configured: {service.Name}", service.Id);
-                return true;
+                else
+                {
+                    buildPath = isLocalDocker ? repoLocalPath : GetDockerTargetPath(service, envConfig, vps);
+                }
             }
-
-            if (!File.Exists(projectFullPath) && !Directory.Exists(projectFullPath))
-            {
-                await log("ERROR", $"❌ [Prep] Project path not found: {projectFullPath}", service.Id);
-                return false;
-            }
-
-            if (Directory.Exists(publishOutput))
-            {
-                try { FileHelper.DeleteDirectoryRecursively(publishOutput); } catch { }
-            }
-
-            await log("INFO", $"🔨 [Prep] Building & publishing {service.Name}...", service.Id);
-            var isLinux = vps?.ServerType == "Linux";
-            bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, service.Id, ct, isLinux);
-
-            if (buildSuccess)
-            {
-                await ApplyEnvironmentConfigsAsync(envConfig, vps, publishOutput, log, service.Id);
-                await log("SUCCESS", $"✅ [Prep] Prepared and configured: {service.Name}", service.Id);
-            }
-
-            return buildSuccess;
         }
         finally
         {
             @lock.Release();
         }
+
+        if (isDockerDeployment)
+        {
+            if (!skipBuildIfOutputExists)
+            {
+                if (isLocalDocker)
+                {
+                    await log("INFO", $"🔨 [Docker] Building container image locally for {service.Name}...", service.Id);
+                }
+                else
+                {
+                    await log("INFO", $"🔨 [Docker] Building container image on VPS for {service.Name}...", service.Id);
+                }
+
+                var buildOk = await dockerLogic.RunComposeAsync(
+                    buildPath,
+                    composeFile,
+                    envComposeFile,
+                    overrideFile,
+                    composeServiceName,
+                    service.DockerComposeProjectName,
+                    "build",
+                    vps,
+                    log,
+                    service.Id,
+                    ct);
+
+                if (!buildOk)
+                {
+                    await log("ERROR", $"❌ [Docker] Docker image build failed for {service.Name}.", service.Id);
+                    return false;
+                }
+                await log("SUCCESS", $"✅ [Docker] Images built successfully for {service.Name}.", service.Id);
+            }
+
+            await log("SUCCESS", $"✅ [Prep] Prepared and configured: {service.Name}", service.Id);
+            return true;
+        }
+
+        if (!File.Exists(projectFullPath) && !Directory.Exists(projectFullPath))
+        {
+            await log("ERROR", $"❌ [Prep] Project path not found: {projectFullPath}", service.Id);
+            return false;
+        }
+
+        if (Directory.Exists(publishOutput))
+        {
+            try { FileHelper.DeleteDirectoryRecursively(publishOutput); } catch { }
+        }
+
+        await log("INFO", $"🔨 [Prep] Building & publishing {service.Name}...", service.Id);
+        var isLinux = vps?.ServerType == "Linux";
+        bool buildSuccess = await buildManager.BuildAsync(projectFullPath, publishOutput, service.ServiceType, service.CompileSingleFile, log, service.Id, ct, isLinux);
+
+        if (buildSuccess)
+        {
+            await ApplyEnvironmentConfigsAsync(envConfig, vps, publishOutput, log, service.Id);
+            await log("SUCCESS", $"✅ [Prep] Prepared and configured: {service.Name}", service.Id);
+        }
+
+        return buildSuccess;
     }
 
 
@@ -448,6 +476,13 @@ public class DeployLogic(
         var effectiveProjectPath = NormalizePath(GetEffectiveProjectPath(service, projectPath));
         var repoLocalPath = gitLogic.GetRepoLocalPath(settings.Git, repoUrl, effectiveProjectPath);
 
+        string composeFile;
+        string? environmentComposeFile;
+        string? overrideFile;
+        string composeServiceName;
+        string targetPath;
+        ProjectVersion? currentVersion;
+
         var @lock = RepositoryLockManager.Get(repoLocalPath);
         await @lock.WaitAsync(ct);
 
@@ -460,13 +495,13 @@ public class DeployLogic(
                     return (false, null, 0, 0);
             }
 
-            var currentVersion = await gitLogic.GetCurrentCommitAsync(repoLocalPath, effectiveBranch);
+            currentVersion = await gitLogic.GetCurrentCommitAsync(repoLocalPath, effectiveBranch);
 
             // 1. Ensure environment configs & variable overrides are applied to repository files
             await ApplyEnvironmentConfigsAsync(envConfig, vps, repoLocalPath, log, serviceId, effectiveProjectPath);
 
             // 2. Prepare Docker Compose & environment files
-            var (dockerPrepOk, composeFile, environmentComposeFile, overrideFile, composeServiceName) =
+            var (dockerPrepOk, cFile, envCFile, oFile, cServiceName) =
                 await PrepareDockerConfigurationAsync(service, envConfig, vps, repoLocalPath, effectiveProjectPath, log, ct);
 
             if (!dockerPrepOk)
@@ -474,9 +509,14 @@ public class DeployLogic(
                 return (false, null, sw.Elapsed.TotalSeconds, 0);
             }
 
+            composeFile = cFile;
+            environmentComposeFile = envCFile;
+            overrideFile = oFile;
+            composeServiceName = cServiceName;
+
             // 3. Transfer to the target server and deploy via Docker Compose
             await log("INFO", $"🐳 [Docker] Deploying with Docker Compose ({composeFile})...", serviceId);
-            var targetPath = GetDockerTargetPath(service, envConfig, vps);
+            targetPath = GetDockerTargetPath(service, envConfig, vps);
             var isRemote = vps != null && !vps.IsLocal && !string.IsNullOrWhiteSpace(vps.Host) && vps.Host != "localhost" && vps.Host != "127.0.0.1";
             if (isRemote)
             {
@@ -493,66 +533,66 @@ public class DeployLogic(
             {
                 targetPath = repoLocalPath;
             }
-
-            // 3. Deploy: start container from the already-built image (no build here)
-            var composeOk = await dockerLogic.RunComposeAsync(
-                targetPath,
-                composeFile,
-                environmentComposeFile,
-                overrideFile,
-                composeServiceName,
-                service.DockerComposeProjectName,
-                "deploy",
-                vps,
-                log,
-                serviceId,
-                ct);
-
-            if (!composeOk)
-            {
-                await log("ERROR", "❌ [Docker] Docker Compose deployment failed.", serviceId);
-                return (false, null, sw.Elapsed.TotalSeconds, 0);
-            }
-
-            await log("SUCCESS", "✅ [Docker] Containers deployed and running successfully!", serviceId);
-
-            // 4. Record history & version
-            if (currentVersion != null)
-            {
-                try
-                {
-                    await servicesLogic.UpdateVersionAsync(service.Id!, envConfig.EnvironmentId, currentVersion);
-
-                    await deployHistoryLogic.AddAsync(new DeploymentHistoryDB
-                    {
-                        ServiceId = service.Id!,
-                        EnvironmentId = envConfig.EnvironmentId,
-                        Version = currentVersion,
-                        ConfigSetIds = envConfig.ConfigSetIds ?? [],
-                        CommitHash = currentVersion.CommitHash,
-                        Created = DateTime.UtcNow
-                    });
-                }
-                catch (Exception ex)
-                {
-                    logger.LogWarning(ex, "Failed to record deployment history for {Service}", service.Name);
-                }
-            }
-
-            // 5. Heartbeat
-            bool? hbSuccess = null;
-            var hbSw = System.Diagnostics.Stopwatch.StartNew();
-            if (!skipHeartbeat && !string.IsNullOrWhiteSpace(envConfig.HeartbeatUrl))
-            {
-                hbSuccess = await CheckHeartbeatAsync(envConfig.HeartbeatUrl, log, serviceId);
-            }
-
-            return (true, hbSuccess, sw.Elapsed.TotalSeconds, hbSw.Elapsed.TotalSeconds);
         }
         finally
         {
             @lock.Release();
         }
+
+        // 3. Deploy: start container from the already-built image (no build here)
+        var composeOk = await dockerLogic.RunComposeAsync(
+            targetPath,
+            composeFile,
+            environmentComposeFile,
+            overrideFile,
+            composeServiceName,
+            service.DockerComposeProjectName,
+            "deploy",
+            vps,
+            log,
+            serviceId,
+            ct);
+
+        if (!composeOk)
+        {
+            await log("ERROR", "❌ [Docker] Docker Compose deployment failed.", serviceId);
+            return (false, null, sw.Elapsed.TotalSeconds, 0);
+        }
+
+        await log("SUCCESS", "✅ [Docker] Containers deployed and running successfully!", serviceId);
+
+        // 4. Record history & version
+        if (currentVersion != null)
+        {
+            try
+            {
+                await servicesLogic.UpdateVersionAsync(service.Id!, envConfig.EnvironmentId, currentVersion);
+
+                await deployHistoryLogic.AddAsync(new DeploymentHistoryDB
+                {
+                    ServiceId = service.Id!,
+                    EnvironmentId = envConfig.EnvironmentId,
+                    Version = currentVersion,
+                    ConfigSetIds = envConfig.ConfigSetIds ?? [],
+                    CommitHash = currentVersion.CommitHash,
+                    Created = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to record deployment history for {Service}", service.Name);
+            }
+        }
+
+        // 5. Heartbeat
+        bool? hbSuccess = null;
+        var hbSw = System.Diagnostics.Stopwatch.StartNew();
+        if (!skipHeartbeat && !string.IsNullOrWhiteSpace(envConfig.HeartbeatUrl))
+        {
+            hbSuccess = await CheckHeartbeatAsync(envConfig.HeartbeatUrl, log, serviceId);
+        }
+
+        return (true, hbSuccess, sw.Elapsed.TotalSeconds, hbSw.Elapsed.TotalSeconds);
     }
 
     private static string GetDockerComposeFile(ServiceDefinitionDB service) =>
