@@ -26,7 +26,7 @@ export class DeployService extends ApiService {
   deployBuild = signal<boolean>(true);
   deployTransfer = signal<boolean>(true);
   deployWaitAllBuilds = signal<boolean>(true);
-  deploySimultaneouslyBuild = signal<boolean>(false);
+  deploySimultaneouslyBuild = signal<boolean>(true);
   deploySimultaneouslyBuildCount = signal<number | null>(3);
 
   private timerInterval: any;
@@ -228,7 +228,7 @@ export class DeployService extends ApiService {
     }
   }
 
-  deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null, forceClean: boolean = false, pull: boolean = true, build: boolean = true, deploy: boolean = true, waitAllBuildsToDeploy: boolean = true, simultaneouslyBuild: boolean = false, simultaneouslyBuildCount: number | null = 3): Observable<DeployLogEntry> {
+  deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null, forceClean: boolean = false, pull: boolean = true, build: boolean = true, deploy: boolean = true, waitAllBuildsToDeploy: boolean = true, simultaneouslyBuild: boolean = true, simultaneouslyBuildCount: number | null = 3): Observable<DeployLogEntry> {
     return this.streamLogs(`${this.baseUrl}/deploy`, { services, environmentId, forceClean, pull, build, deploy, waitAllBuildsToDeploy, simultaneouslyBuild, simultaneouslyBuildCount });
   }
 

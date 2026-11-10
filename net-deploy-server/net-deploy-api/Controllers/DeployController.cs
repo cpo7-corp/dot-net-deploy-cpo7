@@ -21,7 +21,7 @@ public record DeployRequest(
     bool Build = true,
     bool Deploy = true,
     bool WaitAllBuildsToDeploy = true,
-    bool SimultaneouslyBuild = false,
+    bool SimultaneouslyBuild = true,
     int? SimultaneouslyBuildCount = 3);
 
 
