@@ -226,6 +226,8 @@ export class DeployComponent implements OnInit {
     const build = retryMode === 3 ? false : this.deploySvc.deployBuild();
     const deploy = retryMode === 3 ? true : this.deploySvc.deployTransfer();
     const waitAllBuilds = retryMode === 3 ? false : this.deploySvc.deployWaitAllBuilds();
+    const simultaneouslyBuild = retryMode === 3 ? false : this.deploySvc.deploySimultaneouslyBuild();
+    const simultaneouslyBuildCount = this.deploySvc.deploySimultaneouslyBuildCount();
 
     this.deploySvc.startDeployment(
       deploymentConfigs, 
@@ -234,7 +236,9 @@ export class DeployComponent implements OnInit {
       pull, 
       build, 
       deploy,
-      waitAllBuilds
+      waitAllBuilds,
+      simultaneouslyBuild,
+      simultaneouslyBuildCount
     );
   }
 

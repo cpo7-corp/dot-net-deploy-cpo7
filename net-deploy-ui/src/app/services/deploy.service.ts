@@ -119,7 +119,6 @@ export class DeployService extends ApiService {
 
     // BUILD PHASE
     if (message.includes('🔨 [Prep] Building') ||
-        message.includes('📥 [Prep] Pulling') ||
         message.includes('[Docker] Building') ||
         message.includes('[Docker] Applying environment configs')) {
       if (row.deployed !== 'process' && row.deployed !== 'success') {

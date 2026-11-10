@@ -212,7 +212,14 @@ public class DeployController(
 
                 return servicePrepTasks.GetOrAdd(prepKey, async _ =>
                 {
-                    if (buildSemaphore != null) await buildSemaphore.WaitAsync(cts.Token);
+                    if (buildSemaphore != null)
+                    {
+                        if (buildSemaphore.CurrentCount == 0)
+                        {
+                            await Log("INFO", $"⏳ [Build] Waiting for available build slot (max {request.SimultaneouslyBuildCount})...", srv.Id);
+                        }
+                        await buildSemaphore.WaitAsync(cts.Token);
+                    }
                     try
                     {
                         var prepStart = DateTime.UtcNow;
