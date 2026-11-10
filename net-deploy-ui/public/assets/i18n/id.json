@@ -57,6 +57,8 @@
   "strategyPull": "Tarik kode dari git (Pull)",
   "strategyBuild": "Bangun semua layanan sebelum deploy",
   "strategyTransfer": "Transfer dan deploy ke server",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Kompilasi bersamaan",
   "pause": "Jeda",
   "resume": "Lanjutkan",
   "stop": "Berhenti",

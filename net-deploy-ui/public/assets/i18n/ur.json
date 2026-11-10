@@ -57,6 +57,8 @@
   "strategyPull": "گٹ سے کوڈ کھینچیں (Pull)",
   "strategyBuild": "تعیناتی سے پہلے تمام سروسز کا تعمیر (Build) کریں",
   "strategyTransfer": "سرور پر منتقل کریں اور تعینات کریں",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "بیک وقت تعمیر",
   "pause": "وقفہ دیں",
   "resume": "دوبارہ شروع کریں",
   "stop": "روک دیں",

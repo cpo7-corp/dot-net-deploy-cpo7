@@ -57,6 +57,8 @@
   "strategyPull": "Отримати код з Git (Pull)",
   "strategyBuild": "Зібрати всі сервіси перед розгортанням",
   "strategyTransfer": "Перенести та розгорнути на сервері",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Паралельна збірка",
   "pause": "Пауза",
   "resume": "Продовжити",
   "stop": "Стоп",

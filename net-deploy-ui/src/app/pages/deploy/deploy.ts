@@ -405,6 +405,13 @@ export class DeployComponent implements OnInit {
     this.closeCommitSelector();
   }
 
+  onSimultaneouslyBuildCountChange(value: any) {
+    const num = value === '' || value === null || value === undefined ? null : Number(value);
+    if (num === null || (Number.isInteger(num) && num >= 2)) {
+      this.deploySvc.deploySimultaneouslyBuildCount.set(num);
+    }
+  }
+
   updateServiceBranch(serviceId: string, branch: string) {
     this.serviceBranches[serviceId] = branch;
     delete this.serviceCommits[serviceId];
@@ -474,3 +481,4 @@ export class DeployComponent implements OnInit {
     }, 50);
   }
 }
+

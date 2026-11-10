@@ -57,6 +57,8 @@
   "strategyPull": "Git-லிருந்து குறியீட்டைப் பெறு (Pull)",
   "strategyBuild": "வரிசைப்படுத்துவதற்கு முன் அனைத்து சேவைகளையும் உருவாக்கு (Build)",
   "strategyTransfer": "சர்வரிற்கு மாற்றப்படும் மற்றும் வரிசைப்படுத்தப்படும்",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "ஒரே நேரத்தில் உருவாக்கு",
   "pause": "இடைநிறுத்தம்",
   "resume": "தொடரவும்",
   "stop": "நிறுத்து",

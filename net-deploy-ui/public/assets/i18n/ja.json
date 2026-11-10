@@ -57,6 +57,8 @@
   "strategyPull": "Git からコードをプル (Pull)",
   "strategyBuild": "デプロイ前にすべてのサービスをビルド (Build)",
   "strategyTransfer": "サーバーへの転送とデプロイ",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "同時ビルド",
   "pause": "一時停止",
   "resume": "再開",
   "stop": "停止",

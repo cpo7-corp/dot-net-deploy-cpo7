@@ -57,6 +57,8 @@
   "strategyPull": "Hent kode fra git (Pull)",
   "strategyBuild": "Byg alle tjenester før implementering",
   "strategyTransfer": "Overfør og implementer til server",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Byg sideløbende",
   "pause": "Pause",
   "resume": "Genoptag",
   "stop": "Stop",

@@ -173,6 +173,24 @@
                 <i class="bi bi-hourglass-split me-1"></i> {{ 'strategyWaitAllBuilds' | translate }}
               </label>
             </div>
+
+            <div class="d-flex align-items-center gap-2 mt-2">
+              <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="checkSimultaneouslyBuild" [ngModel]="deploySvc.deploySimultaneouslyBuild()"
+                  (ngModelChange)="deploySvc.deploySimultaneouslyBuild.set($event)" [disabled]="deploying()">
+                <label class="form-check-label small" for="checkSimultaneouslyBuild" style="cursor: pointer;"
+                  [class.text-white]="deploySvc.deploySimultaneouslyBuild()" [class.text-secondary]="!deploySvc.deploySimultaneouslyBuild()">
+                  <i class="bi bi-layers me-1"></i> {{ 'strategySimultaneouslyBuild' | translate }}
+                </label>
+              </div>
+              <input type="number" class="form-control form-control-sm bg-dark text-white border-secondary text-center"
+                style="width: 60px;"
+                [ngModel]="deploySvc.deploySimultaneouslyBuildCount()"
+                (ngModelChange)="onSimultaneouslyBuildCountChange($event)"
+                [disabled]="deploying() || !deploySvc.deploySimultaneouslyBuild()"
+                min="2"
+                placeholder="">
+            </div>
           </div>
 
           <button class="btn btn-primary w-100 py-3 fs-5 fw-bold" (click)="startDeploy()"
@@ -477,3 +495,4 @@
     color: #fff !important;
   }
 </style>
+

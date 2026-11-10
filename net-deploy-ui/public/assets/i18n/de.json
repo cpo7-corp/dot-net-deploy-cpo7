@@ -57,6 +57,8 @@
   "strategyPull": "Code von Git abrufen (Pull)",
   "strategyBuild": "Alle Dienste vor der Bereitstellung erstellen (Build)",
   "strategyTransfer": "Auf den Server übertragen und bereitstellen",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Gleichzeitig bauen",
   "pause": "Pause",
   "resume": "Fortsetzen",
   "stop": "Stopp",

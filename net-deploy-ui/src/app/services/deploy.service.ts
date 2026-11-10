@@ -1,4 +1,4 @@
-﻿import { Injectable, NgZone, signal } from '@angular/core';
+import { Injectable, NgZone, signal } from '@angular/core';
 import { ApiService } from './api.service';
 import { DeployLogEntry, PagedResult, ProjectVersion } from '../models/api-models';
 import { Observable, Subject } from 'rxjs';
@@ -26,6 +26,8 @@ export class DeployService extends ApiService {
   deployBuild = signal<boolean>(true);
   deployTransfer = signal<boolean>(true);
   deployWaitAllBuilds = signal<boolean>(true);
+  deploySimultaneouslyBuild = signal<boolean>(false);
+  deploySimultaneouslyBuildCount = signal<number | null>(3);
 
   private timerInterval: any;
   private startTime: number = 0;
@@ -42,7 +44,9 @@ export class DeployService extends ApiService {
     pull: boolean, 
     build: boolean, 
     deploy: boolean,
-    waitAllBuildsToDeploy: boolean = this.deployWaitAllBuilds()
+    waitAllBuildsToDeploy: boolean = this.deployWaitAllBuilds(),
+    simultaneouslyBuild: boolean = this.deploySimultaneouslyBuild(),
+    simultaneouslyBuildCount: number | null = this.deploySimultaneouslyBuildCount()
   ) {
     if (deploy) {
       this.preparedDeployment.set(null);
@@ -62,7 +66,7 @@ export class DeployService extends ApiService {
     
     this.startTimer();
 
-    this.deploy(configs, environmentId, forceClean, pull, build, deploy, waitAllBuildsToDeploy).subscribe({
+    this.deploy(configs, environmentId, forceClean, pull, build, deploy, waitAllBuildsToDeploy, simultaneouslyBuild, simultaneouslyBuildCount).subscribe({
       next: (entry: DeployLogEntry) => {
         if (entry.level === 'SESSION_ID') {
           this.currentSessionId.set(entry.message);
@@ -225,8 +229,8 @@ export class DeployService extends ApiService {
     }
   }
 
-  deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null, forceClean: boolean = false, pull: boolean = true, build: boolean = true, deploy: boolean = true, waitAllBuildsToDeploy: boolean = true): Observable<DeployLogEntry> {
-    return this.streamLogs(`${this.baseUrl}/deploy`, { services, environmentId, forceClean, pull, build, deploy, waitAllBuildsToDeploy });
+  deploy(services: { serviceId: string, branch?: string }[], environmentId?: string | null, forceClean: boolean = false, pull: boolean = true, build: boolean = true, deploy: boolean = true, waitAllBuildsToDeploy: boolean = true, simultaneouslyBuild: boolean = false, simultaneouslyBuildCount: number | null = 3): Observable<DeployLogEntry> {
+    return this.streamLogs(`${this.baseUrl}/deploy`, { services, environmentId, forceClean, pull, build, deploy, waitAllBuildsToDeploy, simultaneouslyBuild, simultaneouslyBuildCount });
   }
 
   serviceAction(serviceId: string, environmentId: string, action: string): Observable<DeployLogEntry> {
@@ -315,3 +319,7 @@ export interface SessionSummary {
   created: string;
   hasErrors: boolean;
 }
+
+
+
+

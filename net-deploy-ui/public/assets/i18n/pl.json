@@ -57,6 +57,8 @@
   "strategyPull": "Pobierz kod z Git (Pull)",
   "strategyBuild": "Zbuduj wszystkie usługi przed wdrożeniem",
   "strategyTransfer": "Prześlij i wdróż na serwerze",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Równoległa kompilacja",
   "pause": "Wstrzymaj",
   "resume": "Wznów",
   "stop": "Zatrzymaj",

@@ -57,6 +57,8 @@
   "strategyPull": "Vuta msimbo kutoka Git (Pull)",
   "strategyBuild": "Jenga huduma zote kabla ya kupeleka",
   "strategyTransfer": "Hamisha na upeleke kwenye seva",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Jenga wakati mmoja",
   "pause": "Sitisha",
   "resume": "Endelea",
   "stop": "Acha",

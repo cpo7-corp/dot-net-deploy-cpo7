@@ -57,6 +57,8 @@
   "strategyPull": "Puxar código do git (Pull)",
   "strategyBuild": "Compilar todos os serviços antes da implantação",
   "strategyTransfer": "Transferir e implantar no servidor",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Compilar simultaneamente",
   "pause": "Pausar",
   "resume": "Retomar",
   "stop": "Parar",

@@ -57,6 +57,8 @@
   "strategyPull": "Hämta kod från git (Pull)",
   "strategyBuild": "Bygg alla tjänster före distribution",
   "strategyTransfer": "Överför och distribuera till server",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Bygg samtidigt",
   "pause": "Pausa",
   "resume": "Återuppta",
   "stop": "Stoppa",

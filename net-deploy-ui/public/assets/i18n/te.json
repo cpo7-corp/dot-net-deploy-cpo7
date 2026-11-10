@@ -57,6 +57,8 @@
   "strategyPull": "Git నుండి కోడ్‌ని తీసుకో (Pull)",
   "strategyBuild": "మోహరింపుకు ముందు అన్ని సేవలను బిల్డ్ చేయి",
   "strategyTransfer": "సర్వర్‌కు బదిలీ చేసి మోహరించు",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "ఏకకాలంలో నిర్మించు",
   "pause": "పాజ్ చేయి",
   "resume": "తిరిగి ప్రారంభించు",
   "stop": "ఆపు",

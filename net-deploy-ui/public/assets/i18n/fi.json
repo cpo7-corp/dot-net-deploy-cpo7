@@ -57,6 +57,8 @@
   "strategyPull": "Hae koodi Gitistä (Pull)",
   "strategyBuild": "Rakenna kaikki palvelut ennen julkaisua",
   "strategyTransfer": "Siirrä ja julkaise palvelimelle",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Samanaikainen kokoaminen",
   "pause": "Tauko",
   "resume": "Jatka",
   "stop": "Lopeta",

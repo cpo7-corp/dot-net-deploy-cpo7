@@ -57,6 +57,8 @@
   "strategyPull": "Preia cod din git (Pull)",
   "strategyBuild": "Compilează toate serviciile înainte de deploy",
   "strategyTransfer": "Transferă și instalează pe server",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Compilare simultană",
   "pause": "Pauză",
   "resume": "Reluare",
   "stop": "Stop",

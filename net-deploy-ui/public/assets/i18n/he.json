@@ -144,6 +144,7 @@
   "strategyBuild": "בניית קוד (Build)",
   "strategyTransfer": "העלאת קבצים ביעד (Deploy)",
   "strategyWaitAllBuilds": "המתן לסיום כל הבניות לפני הפריסה",
+  "strategySimultaneouslyBuild": "בנייה במקביל",
   "deploymentSummary": "סיכום פריסה",
   "totalTime": "זמן כולל",
   "buildTime": "זמן בנייה",

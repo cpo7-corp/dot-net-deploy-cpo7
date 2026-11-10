@@ -57,6 +57,8 @@
   "strategyPull": "从 Git 拉取代码",
   "strategyBuild": "部署前构建所有服务",
   "strategyTransfer": "传输并部署到服务器",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "同时构建",
   "pause": "暂停",
   "resume": "恢复",
   "stop": "停止",

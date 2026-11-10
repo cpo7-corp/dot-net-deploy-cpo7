@@ -57,6 +57,8 @@
   "strategyPull": "Recupera codice da git (Pull)",
   "strategyBuild": "Compila tutti i servizi prima della distribuzione",
   "strategyTransfer": "Trasferisci e distribuisci sul server",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Compilazione simultanea",
   "pause": "Pausa",
   "resume": "Riprendi",
   "stop": "Ferma",

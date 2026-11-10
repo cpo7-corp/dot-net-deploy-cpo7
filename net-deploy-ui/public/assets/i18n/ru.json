@@ -57,6 +57,8 @@
   "strategyPull": "Подтянуть код из Git (Pull)",
   "strategyBuild": "Собрать все сервисы перед развертыванием",
   "strategyTransfer": "Перенести и развернуть на сервере",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Параллельная сборка",
   "pause": "Пауза",
   "resume": "Возобновить",
   "stop": "Стоп",

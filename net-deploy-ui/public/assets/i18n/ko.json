@@ -57,6 +57,8 @@
   "strategyPull": "Git에서 코드 가져오기 (Pull)",
   "strategyBuild": "배포 전 모든 서비스 빌드 (Build)",
   "strategyTransfer": "서버로 전송 및 배포",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "동시 빌드",
   "pause": "일시 정지",
   "resume": "재개",
   "stop": "중지",

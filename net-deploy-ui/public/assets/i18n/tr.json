@@ -57,6 +57,8 @@
   "strategyPull": "Kodu git'ten çek (Pull)",
   "strategyBuild": "Dağıtımdan önce tüm hizmetleri oluştur (Build)",
   "strategyTransfer": "Sunucuya aktar ve dağıt",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Eş zamanlı derleme",
   "pause": "Duraklat",
   "resume": "Devam Et",
   "stop": "Durdur",

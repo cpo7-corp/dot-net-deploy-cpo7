@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using NET.Deploy.Api.Data.Entities;
 using NET.Deploy.Api.Logic.Deploy;
 using NET.Deploy.Api.Logic.DeployLogs;
@@ -20,7 +20,9 @@ public record DeployRequest(
     bool Pull = true,
     bool Build = true,
     bool Deploy = true,
-    bool WaitAllBuildsToDeploy = true);
+    bool WaitAllBuildsToDeploy = true,
+    bool SimultaneouslyBuild = false,
+    int? SimultaneouslyBuildCount = 3);
 
 
 [ApiController]
@@ -132,6 +134,11 @@ public class DeployController(
             var repoUpdateTasks = new ConcurrentDictionary<string, Task<bool>>();
             var servicePrepTasks = new ConcurrentDictionary<string, Task<(bool Success, double BuildSeconds)>>();
 
+            // Semaphore to limit simultaneous builds (null = unlimited)
+            var buildSemaphore = (request.SimultaneouslyBuild && request.SimultaneouslyBuildCount is >= 2)
+                ? new SemaphoreSlim(request.SimultaneouslyBuildCount.Value, request.SimultaneouslyBuildCount.Value)
+                : null;
+
             async Task<bool> DownloadAllRepositoriesAsync()
             {
                 if (!request.Pull) return true;
@@ -205,9 +212,17 @@ public class DeployController(
 
                 return servicePrepTasks.GetOrAdd(prepKey, async _ =>
                 {
-                    var prepStart = DateTime.UtcNow;
-                    var success = await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, skipBuildIfOutputExists: !request.Build, cts.Token);
-                    return (success, (DateTime.UtcNow - prepStart).TotalSeconds);
+                    if (buildSemaphore != null) await buildSemaphore.WaitAsync(cts.Token);
+                    try
+                    {
+                        var prepStart = DateTime.UtcNow;
+                        var success = await deployLogic.PrepAndBuildServiceAsync(srv, settings, Log, vpsSettings.Id, branchOverride, request.ForceClean, skipPull: true, skipBuildIfOutputExists: !request.Build, cts.Token);
+                        return (success, (DateTime.UtcNow - prepStart).TotalSeconds);
+                    }
+                    finally
+                    {
+                        buildSemaphore?.Release();
+                    }
                 });
             }
 

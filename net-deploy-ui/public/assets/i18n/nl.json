@@ -57,6 +57,8 @@
   "strategyPull": "Code ophalen van Git (Pull)",
   "strategyBuild": "Alle services bouwen voor implementatie",
   "strategyTransfer": "Overdragen en implementeren op server",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Gelijktijdig bouwen",
   "pause": "Pauzeren",
   "resume": "Hervatten",
   "stop": "Stoppen",

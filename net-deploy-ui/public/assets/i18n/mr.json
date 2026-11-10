@@ -57,6 +57,8 @@
   "strategyPull": "गिटमधून कोड खेचा (Pull)",
   "strategyBuild": "तैनातीपूर्वी सर्व सेवा तयार (Build) करा",
   "strategyTransfer": "सर्व्हरवर स्थानांतरित आणि तैनात करा",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "एकत्रित बिल्ड",
   "pause": "विराम द्या",
   "resume": "पुन्हा सुरू करा",
   "stop": "थांबवा",

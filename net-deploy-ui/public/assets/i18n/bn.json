@@ -57,6 +57,8 @@
   "strategyPull": "গিট থেকে কোড নেওয়া (Pull Code)",
   "strategyBuild": "মোতায়েন এর আগে সমস্ত পরিষেবা তৈরি (Build) করুন",
   "strategyTransfer": "সার্ভারে স্থানান্তর এবং মোতায়েন করুন",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "একযোগে বিল্ড",
   "pause": "বিরতি দিন",
   "resume": "পুনরায় শুরু করুন",
   "stop": "বন্ধ করুন",

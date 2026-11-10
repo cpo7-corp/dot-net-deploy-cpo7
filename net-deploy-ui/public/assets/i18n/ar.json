@@ -57,6 +57,8 @@
   "strategyPull": "جلب الكود من git (Pull)",
   "strategyBuild": "بناء جميع الخدمات قبل النشر",
   "strategyTransfer": "نقل ونشر إلى الخادم",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "بناء متزامن",
   "pause": "إيقاف مؤقت",
   "resume": "استئناف",
   "stop": "إيقاف",

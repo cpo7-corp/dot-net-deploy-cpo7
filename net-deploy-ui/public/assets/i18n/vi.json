@@ -57,6 +57,8 @@
   "strategyPull": "Lấy mã từ Git (Pull code)",
   "strategyBuild": "Biên dịch tất cả dịch vụ trước khi triển khai",
   "strategyTransfer": "Chuyển giao và triển khai lên máy chủ",
+  "strategyWaitAllBuilds": "Wait all builds to deploy",
+  "strategySimultaneouslyBuild": "Biên dịch đồng thời",
   "pause": "Tạm dừng",
   "resume": "Tiếp tục",
   "stop": "Dừng",
